@@ -1,0 +1,10 @@
+[package]
+name = "soundio"
+version = "0.1.0"
+authors = ["Tim Hutt <tdhutt@gmail.com>"]
+links = "libsoundio"
+build = "build.rs"
+
+[dependencies]
+libc = "0.2.17"
+error-chain = "0.7.1"
