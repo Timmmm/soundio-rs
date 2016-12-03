@@ -21,4 +21,8 @@ fn main() {
     } 
 
     println!("InitAudioBackend error: {}", soundio::Error::InitAudioBackend);
+
+    let mut ctx = soundio::Context::new();
+
+    println!("Available backends: {:?}", ctx.available_backends());
 }

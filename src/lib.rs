@@ -254,6 +254,35 @@ pub enum Backend {
 	Dummy,
 }
 
+
+impl From<bindings::SoundIoBackend> for Backend {
+    fn from(backend: bindings::SoundIoBackend) -> Backend {
+		match backend {
+			bindings::SoundIoBackend::SoundIoBackendJack => Backend::Jack,
+			bindings::SoundIoBackend::SoundIoBackendPulseAudio => Backend::PulseAudio,
+			bindings::SoundIoBackend::SoundIoBackendAlsa => Backend::Alsa,
+			bindings::SoundIoBackend::SoundIoBackendCoreAudio => Backend::CoreAudio,
+			bindings::SoundIoBackend::SoundIoBackendWasapi => Backend::Wasapi,
+			bindings::SoundIoBackend::SoundIoBackendDummy => Backend::Dummy,
+			_ => Backend::None,
+		}
+    }
+}
+
+impl From<Backend> for bindings::SoundIoBackend {
+    fn from(backend: Backend) -> bindings::SoundIoBackend {
+		match backend {
+			Backend::Jack => bindings::SoundIoBackend::SoundIoBackendJack,
+			Backend::PulseAudio => bindings::SoundIoBackend::SoundIoBackendPulseAudio,
+			Backend::Alsa => bindings::SoundIoBackend::SoundIoBackendAlsa,
+			Backend::CoreAudio => bindings::SoundIoBackend::SoundIoBackendCoreAudio,
+			Backend::Wasapi => bindings::SoundIoBackend::SoundIoBackendWasapi,
+			Backend::Dummy => bindings::SoundIoBackend::SoundIoBackendDummy,
+			_ => bindings::SoundIoBackend::SoundIoBackendNone,
+		}
+    }
+}
+
 impl fmt::Display for Backend {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		// TODO: This may be overkill - I could just use the #[derive(Debug)] output; it's nearly identical.
@@ -311,7 +340,7 @@ pub struct SampleRateRange {
 	max: i32,
 }
 
-struct Context {
+pub struct Context {
 /*
     /// Optional callback. Called when the list of devices change. Only called
     /// during a call to ::soundio_flush_events or ::soundio_wait_events.
@@ -370,7 +399,7 @@ struct Context {
 
 impl Context {
 
-	fn new() -> Context {
+	pub fn new() -> Context {
 		Context {
 			soundio: {
 				let ctx = unsafe { bindings::soundio_create() };
@@ -384,7 +413,7 @@ impl Context {
 		}
 	}
 
-	fn connect(&mut self) -> Result<()> {
+	pub fn connect(&mut self) -> Result<()> {
 		unsafe {
 			let ret = bindings::soundio_connect(self.soundio);
 			match ret {
@@ -394,10 +423,20 @@ impl Context {
 		}
 	}
 
-	fn disconnect(&mut self) {
+	pub fn disconnect(&mut self) {
 		unsafe {
 			bindings::soundio_disconnect(self.soundio);
 		}
+	}
+
+	pub fn available_backends(&mut self) -> Vec<Backend> {
+		// TODO: Use soundio_backend_count() and soundio_get_backend().
+		let count = unsafe { bindings::soundio_backend_count(self.soundio) };
+		let mut backends = Vec::with_capacity(count as usize);
+		for i in 0..count {
+			backends.push( unsafe { bindings::soundio_get_backend(self.soundio, i).into() } );
+		}
+		backends
 	}
 
 }
@@ -430,11 +469,7 @@ pub fn version() -> (i32, i32, i32) {
 
 pub fn have_backend(backend: Backend) -> bool {
 	unsafe {
-		// TODO: Don't use transmute.
-		bindings::soundio_have_backend(mem::transmute(backend as u32)) != 0
+		bindings::soundio_have_backend(backend.into()) != 0
 	}
 }
 
-pub fn available_backends() -> Vec<Backend> {
-	// TODO: Use soundio_backend_count() and soundio_get_backend().
-}
