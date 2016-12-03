@@ -9,7 +9,7 @@ use std::fmt;
 use std::error;
 use std::result;
 
-use std::os::raw::c_int;
+use std::os::raw::{c_int, c_char};
 
 
 
@@ -23,6 +23,7 @@ pub enum Error {
 	SystemResources,
 	/// Attempted to open a device and failed.
 	OpeningDevice,
+	/// No device found.
 	NoSuchDevice,
 	/// The programmer did not comply with the API.
 	Invalid,
@@ -114,7 +115,7 @@ impl error::Error for Error {
 	fn description(&self) -> &str {
 		// TODO: I'm sure there is a simpler way than .clone().into(). I thought that by doing #[derive(Copy)]
 		// it would automatically clone it...
-		let c_str: &CStr = unsafe { CStr::from_ptr(bindings::soundio_strerror(self.clone().into())) };
+		let c_str: &CStr = unsafe { CStr::from_ptr(bindings::soundio_strerror((*self).into())) };
 
 		// TODO: to_str() checks for valid UTF-8 since that what a &str is. Is it safe to assume
 		// soundio_strerror() never returns invalid UTF-8?
@@ -125,6 +126,13 @@ impl error::Error for Error {
 		// We never have any more cause information unfortunately.
 		None
 	}
+}
+
+impl From<Error> for String {
+    fn from(err: Error) -> String {
+		use std::error::Error;
+		err.description().to_string()
+    }
 }
 
 /// Specifies where a channel is physically located.
@@ -330,7 +338,6 @@ pub enum Format {
 #[derive(Debug)]
 pub struct ChannelLayout {
 	name: String,
-	channel_count: i32,
 	channels: Vec<ChannelId>,
 }
 
@@ -414,18 +421,30 @@ impl Context {
 	}
 
 	pub fn connect(&mut self) -> Result<()> {
-		unsafe {
-			let ret = bindings::soundio_connect(self.soundio);
-			match ret {
-				0 => Ok(()),
-				_ => Err(ret.into()),
-			}
+		let ret = unsafe { bindings::soundio_connect(self.soundio) };
+		match ret {
+			0 => Ok(()),
+			_ => Err(ret.into()),
+		}
+	}
+
+	pub fn connect_backend(&mut self, backend: Backend) -> Result<()> {
+		let ret = unsafe { bindings::soundio_connect_backend(self.soundio, backend.into()) };
+		match ret {
+			0 => Ok(()),
+			_ => Err(ret.into()),
 		}
 	}
 
 	pub fn disconnect(&mut self) {
 		unsafe {
 			bindings::soundio_disconnect(self.soundio);
+		}
+	}
+
+	pub fn current_backend(&mut self) -> Backend {
+		unsafe {
+			(*self.soundio).current_backend.into()
 		}
 	}
 
@@ -439,6 +458,91 @@ impl Context {
 		backends
 	}
 
+	// You have to call this before enumerating devices.
+	pub fn flush_events(&mut self) {
+		unsafe {
+			bindings::soundio_flush_events(self.soundio);
+		}
+	}
+
+	pub fn wait_events(&mut self) {
+		unsafe {
+			bindings::soundio_wait_events(self.soundio);
+		}
+	}
+
+	pub fn wakeup(&mut self) {
+		unsafe {
+			bindings::soundio_wakeup(self.soundio);
+		}
+	}
+
+	pub fn force_device_scan(&mut self) {
+		unsafe {
+			bindings::soundio_force_device_scan(self.soundio);
+		}
+	}
+
+
+	// Devices
+
+	// Get a device, or None() if the index is out of bounds or you never called flush_events()
+	// (you have to call flush_events() before getting devices)
+	pub fn get_input_device(&mut self, index: usize) -> Option<Device> {
+		let device = unsafe { bindings::soundio_get_input_device(self.soundio, index as c_int) };
+		if device == ptr::null_mut() {
+			return None;
+		}
+
+		Some(Device {
+			device: device
+		})
+	}
+
+	pub fn get_output_device(&mut self, index: usize) -> Option<Device> {
+		let device = unsafe { bindings::soundio_get_output_device(self.soundio, index as c_int) };
+		if device == ptr::null_mut() {
+			return None;
+		}
+
+		Some(Device {
+			device: device
+		})
+	}
+
+	// Returns None if you never called flush_events().
+	pub fn input_device_count(&mut self) -> Option<usize> {
+		let count = unsafe { bindings::soundio_input_device_count(self.soundio) as usize };
+		match count {
+			0 => None,
+			_ => Some(count),
+		}
+	}
+
+	pub fn output_device_count(&mut self) -> Option<usize> {
+		let count = unsafe { bindings::soundio_output_device_count(self.soundio) as usize };
+		match count {
+			0 => None,
+			_ => Some(count),
+		}
+	}
+	
+	// Returns None if you never called flush_events().
+	pub fn default_input_device_index(&mut self) -> Option<usize> {
+		let index = unsafe { bindings::soundio_default_input_device_index(self.soundio) as usize };
+		match index {
+			0 => None,
+			_ => Some(index),
+		}
+	}
+
+	pub fn default_output_device_index(&mut self) -> Option<usize> {
+		let index = unsafe { bindings::soundio_default_output_device_index(self.soundio) as usize };
+		match index {
+			0 => None,
+			_ => Some(index),
+		}
+	}
 }
 
 impl Drop for Context {
@@ -450,10 +554,108 @@ impl Drop for Context {
 }
 
 
+
+pub struct Device {
+	device: *mut bindings::SoundIoDevice,
+}
+
+impl Device {
+
+	pub fn name(&mut self) -> String {
+		latin1_to_string(unsafe { (*self.device).name } )
+	}
+
+	pub fn sort_channel_layouts(&mut self) {
+		unsafe {
+			bindings::soundio_device_sort_channel_layouts(self.device);
+		}
+	}
+
+	pub fn supports_format(&mut self, format: Format) -> bool {
+		false
+	}
+
+	// pub fn supports_layout(&mut self, layout: Layout) -> bool {
+	// 	false
+	// }
+
+	pub fn supports_sample_rate(&mut self, sample_rate: i32) -> bool {
+		false
+	}
+
+	pub fn nearest_sample_rate(&mut self, sample_rate: i32) -> i32 {
+		0
+	}
+/*
+	pub fn create_outstream(&mut self) -> OutStream {
+
+	}
+
+	pub fn create_instream(&mut self) -> InStream {
+
+	}*/
+}
+
+impl Drop for Device {
+	fn drop(&mut self) {
+		unsafe {
+			bindings::soundio_device_unref(self.device);
+		}
+	}
+}
+
+
+pub struct OutStream {
+	outstream: *mut bindings::SoundIoOutStream,
+}
+
+// Outstream; copy this for instream.
+impl OutStream {
+	pub fn open(&mut self) -> Result<()> {
+		Ok(())
+	}
+	pub fn start(&mut self) -> Result<()> {
+		Ok(())
+	}
+	// Can only be called from the write_callback thread context.
+	pub fn begin_write(&mut self) -> Result<()> {
+		Ok(())
+	}
+	// Can only be called from the write_callback thread context.
+	// TODO: In order to enforce that maybe I create another object and pass that object to the callback. 
+	pub fn end_write(&mut self) -> Result<()> {
+		Ok(())
+	}
+
+	pub fn clear_buffer(&mut self) -> Result<()> {
+		Ok(())
+	}
+
+	pub fn pause(&mut self, pause: bool) -> Result<()> {
+		Ok(())
+	}
+
+	pub fn get_latency(&mut self) -> Result<f64> {
+		Ok(1.0)
+	}
+}
+
+impl Drop for OutStream {
+	fn drop(&mut self) {
+		unsafe {
+			bindings::soundio_outstream_destroy(self.outstream);
+		}
+	}
+}
+
+
+
+
+
+
+
 pub fn version_string() -> String {
-	let c_str: &CStr = unsafe { CStr::from_ptr(bindings::soundio_version_string()) };
-	// This converts Latin1 to a String, instead of assuming UTF-8 (which I probably could to be fair).
-	c_str.to_bytes().iter().map(|&c| c as char).collect()
+	latin1_to_string(unsafe { bindings::soundio_version_string() } )
 }
 
 
@@ -473,3 +675,28 @@ pub fn have_backend(backend: Backend) -> bool {
 	}
 }
 
+
+
+
+
+// Convert a Latin1 C String to a String.
+// If `s` is null, an empty string is returned.
+fn latin1_to_string(s: *const c_char) -> String {
+	if s == ptr::null() {
+		return String::new();
+	}
+	let c_str: &CStr = unsafe { CStr::from_ptr(s) };
+	// This converts Latin1 to a String, instead of assuming UTF-8 (which I probably could to be fair).
+	c_str.to_bytes().iter().map(|&c| c as char).collect()
+}
+
+// Convert a UTF-8 C String to a String.
+// If `s` is null or contains invalid UTF-8, an empty string is returned.
+fn utf8_to_string(s: *const c_char) -> String {
+	if s == ptr::null() {
+		return String::new();
+	}
+	let c_str: &CStr = unsafe { CStr::from_ptr(s) };
+
+	c_str.to_str().unwrap_or("").to_string()
+}
