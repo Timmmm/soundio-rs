@@ -1,4 +1,6 @@
 #![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 
 mod bindings;
 
@@ -10,8 +12,6 @@ use std::error;
 use std::result;
 
 use std::os::raw::{c_int, c_char};
-
-
 
 #[derive(Debug, Copy, Clone)]
 pub enum Error {
@@ -348,76 +348,50 @@ pub struct SampleRateRange {
 }
 
 pub struct Context {
-/*
-    /// Optional callback. Called when the list of devices change. Only called
-    /// during a call to ::soundio_flush_events or ::soundio_wait_events.
-	on_devices_change: fn (),
-    /// Optional callback. Called when the backend disconnects. For example,
-    /// when the JACK server shuts down. When this happens, listing devices
-    /// and opening streams will always fail with
-    /// SoundIoErrorBackendDisconnected. This callback is only called during a
-    /// call to ::soundio_flush_events or ::soundio_wait_events.
-    /// If you do not supply a callback, the default will crash your program
-    /// with an error message. This callback is also called when the thread
-    /// that retrieves device information runs into an unrecoverable condition
-    /// such as running out of memory.
-    ///
-    /// Possible errors:
-    /// * #SoundIoErrorBackendDisconnected
-    /// * #SoundIoErrorNoMem
-    /// * #SoundIoErrorSystemResources
-    /// * #SoundIoErrorOpeningDevice - unexpected problem accessing device
-    ///   information
-    on_backend_disconnect: fn(err: Error),
-
-    /// Optional callback. Called from an unknown thread that you should not use
-    /// to call any soundio functions. You may use this to signal a condition
-    /// variable to wake up. Called when ::soundio_wait_events would be woken up.
-    on_events_signal: fn (),
-
-
-    /// Optional: Application name.
-    /// PulseAudio uses this for "application name".
-    /// JACK uses this for `client_name`.
-    /// Must not contain a colon (":").
-    app_name: String,
-
-    /// Optional: Real time priority warning.
-    /// This callback is fired when making thread real-time priority failed. By
-    /// default, it will print to stderr only the first time it is called
-    /// a message instructing the user how to configure their system to allow
-    /// real-time priority threads. This must be set to a function not NULL.
-    /// To silence the warning, assign this to a function that does nothing.
-    emit_rtprio_warning: fn(),
-
-    /// Optional: JACK info callback.
-    /// By default, libsoundio sets this to an empty function in order to
-    /// silence stdio messages from JACK. You may override the behavior by
-    /// setting this to `NULL` or providing your own function. This is
-    /// registered with JACK regardless of whether ::soundio_connect_backend
-    /// succeeds.
-    jack_info_callback: fn(msg: &str),
-    /// Optional: JACK error callback.
-    /// See SoundIo::jack_info_callback
-    jack_error_callback: fn(msg: &str),*/
-
+	// The soundio library instance.
 	soundio: *mut bindings::SoundIo,
+	app_name: String,
+}
+
+extern fn on_backend_disconnect(sio: *mut bindings::SoundIo, err: c_int) {
+	println!("Backend disconnected: {}", Error::from(err));
+}
+
+extern fn on_devices_change(sio: *mut bindings::SoundIo, err: c_int) {
+	println!("Backend disconnected: {}", Error::from(err));
 }
 
 impl Context {
 
 	pub fn new() -> Context {
-		Context {
-			soundio: {
-				let ctx = unsafe { bindings::soundio_create() };
-				if ctx == ptr::null_mut() {
-					// Note that we should really abort() here (that's what the rest of Rust
-					// does on OOM), but there is no stable way to abort in Rust that I can see.
-					panic!("soundio_create() failed (out of memory).");
-				}
-				ctx
-			}
+		let soundio = unsafe { bindings::soundio_create() };
+		if soundio == ptr::null_mut() {
+			// Note that we should really abort() here (that's what the rest of Rust
+			// does on OOM), but there is no stable way to abort in Rust that I can see.
+			panic!("soundio_create() failed (out of memory).");
 		}
+
+		let context = Context { 
+			soundio: soundio,
+			app_name: String::new(),
+		};
+//		(*context.soundio).userdata = &context;
+
+		// Note that the default on_backend_disconnect() handler panics! We'll change that.
+		unsafe {
+			(*context.soundio).on_backend_disconnect = on_backend_disconnect as *mut extern fn(*mut bindings::SoundIo, i32);
+//			(*context.soundio).on_devices_change = on_devices_change as 
+		}
+		context
+	}
+
+	pub fn set_app_name(&mut self, name: String) {
+		self.app_name = name;
+//		(self.soundio).app_name = ???;
+	}
+
+	pub fn app_name(&self) -> String {
+		self.app_name.clone()
 	}
 
 	pub fn connect(&mut self) -> Result<()> {
@@ -488,60 +462,80 @@ impl Context {
 
 	// Get a device, or None() if the index is out of bounds or you never called flush_events()
 	// (you have to call flush_events() before getting devices)
-	pub fn get_input_device(&mut self, index: usize) -> Option<Device> {
+	pub fn get_input_device(&mut self, index: usize) -> result::Result<Device, ()> {
 		let device = unsafe { bindings::soundio_get_input_device(self.soundio, index as c_int) };
 		if device == ptr::null_mut() {
-			return None;
+			return Err(());
 		}
 
-		Some(Device {
+		Ok(Device {
 			device: device
 		})
 	}
 
-	pub fn get_output_device(&mut self, index: usize) -> Option<Device> {
+	pub fn get_output_device(&mut self, index: usize) -> result::Result<Device, ()> {
 		let device = unsafe { bindings::soundio_get_output_device(self.soundio, index as c_int) };
 		if device == ptr::null_mut() {
-			return None;
+			return Err(());
 		}
 
-		Some(Device {
+		Ok(Device {
 			device: device
 		})
 	}
 
-	// Returns None if you never called flush_events().
-	pub fn input_device_count(&mut self) -> Option<usize> {
-		let count = unsafe { bindings::soundio_input_device_count(self.soundio) as usize };
+	// Returns Err(()) if you never called flush_events().
+	pub fn input_device_count(&mut self) -> result::Result<usize, ()> {
+		let count = unsafe { bindings::soundio_input_device_count(self.soundio) };
 		match count {
-			0 => None,
-			_ => Some(count),
+			-1 => Err(()),
+			_ => Ok(count as usize),
 		}
 	}
 
-	pub fn output_device_count(&mut self) -> Option<usize> {
-		let count = unsafe { bindings::soundio_output_device_count(self.soundio) as usize };
+	pub fn output_device_count(&mut self) -> result::Result<usize, ()> {
+		let count = unsafe { bindings::soundio_output_device_count(self.soundio) };
 		match count {
-			0 => None,
-			_ => Some(count),
+			-1 => Err(()),
+			_ => Ok(count as usize),
 		}
 	}
 	
 	// Returns None if you never called flush_events().
-	pub fn default_input_device_index(&mut self) -> Option<usize> {
-		let index = unsafe { bindings::soundio_default_input_device_index(self.soundio) as usize };
+	pub fn default_input_device_index(&mut self) -> result::Result<usize, ()> {
+		let index = unsafe { bindings::soundio_default_input_device_index(self.soundio) };
 		match index {
-			0 => None,
-			_ => Some(index),
+			-1 => Err(()),
+			_ => Ok(index as usize),
 		}
 	}
 
-	pub fn default_output_device_index(&mut self) -> Option<usize> {
-		let index = unsafe { bindings::soundio_default_output_device_index(self.soundio) as usize };
+	pub fn default_output_device_index(&mut self) -> result::Result<usize, ()> {
+		let index = unsafe { bindings::soundio_default_output_device_index(self.soundio) };
 		match index {
-			0 => None,
-			_ => Some(index),
+			-1 => Err(()),
+			_ => Ok(index as usize),
 		}
+	}
+
+	// Get all the input devices. If you never called flush_events() it returns Err(()).
+	pub fn input_devices(&mut self) -> result::Result<Vec<Device>, ()> {
+		let count = self.input_device_count()?;
+		let mut devices = Vec::new();
+		for i in 0..count {
+			devices.push(self.get_input_device(i)?);
+		}
+		Ok(devices)
+	}
+
+	// Get all the output devices. If you never called flush_events() it returns Err(()).
+	pub fn output_devices(&mut self) -> result::Result<Vec<Device>, ()> {
+		let count = self.output_device_count()?;
+		let mut devices = Vec::new();
+		for i in 0..count {
+			devices.push(self.get_output_device(i)?);
+		}
+		Ok(devices)
 	}
 }
 
@@ -561,8 +555,12 @@ pub struct Device {
 
 impl Device {
 
-	pub fn name(&mut self) -> String {
+	pub fn name(&self) -> String {
 		latin1_to_string(unsafe { (*self.device).name } )
+	}
+
+	pub fn is_raw(&self) -> bool {
+		unsafe { (*self.device).is_raw != 0 }
 	}
 
 	pub fn sort_channel_layouts(&mut self) {

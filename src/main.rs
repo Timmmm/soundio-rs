@@ -1,6 +1,10 @@
 extern crate soundio;
 
+
+// Print sound soundio debug info and play back a sound.
 fn run() -> Result<(), String> {
+
+
 	println!("Soundio version: {}", soundio::version_string());
 
 	let (major, minor, patch) = soundio::version();
@@ -30,7 +34,23 @@ fn run() -> Result<(), String> {
 
 	println!("Current backend: {:?}", ctx.current_backend());
 
+	// We have to flush events so we can scan devices.
+	println!("Flushing events.");
+	ctx.flush_events();
+	println!("Flushed");
+
+	println!("Input device count: {}", ctx.input_device_count().unwrap_or(0));
+	println!("Output device count: {}", ctx.output_device_count().unwrap_or(0));
+
+	let output_devices = ctx.output_devices().map_err(|_| "Error getting output devices".to_string())?;
+
+	for dev in output_devices {
+		println!("Output device: {} {}", dev.name(), if dev.is_raw() { "raw" } else { "cooked" } );
+	}
+
 	Ok(())
+
+
 }
 
 fn main() {
