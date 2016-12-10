@@ -5,3 +5,11 @@ rustc-link-lib = [":libsoundio.a"]
 [target.x86_64-pc-windows-gnu.libsoundio]
 rustc-link-search = ["libsoundio-1.1.0/x86_64"]
 rustc-link-lib = [":libsoundio.a"]
+
+[target.i686-pc-windows-msvc.libsoundio]
+rustc-link-search = ["libsoundio-1.1.0/i686"]
+#rustc-link-lib = ["soundio.lib"]
+
+[target.x86_64-pc-windows-mscv.libsoundio]
+rustc-link-search = ["libsoundio-1.1.0/x86_64"]
+#rustc-link-lib = ["soundio.lib"]
