@@ -656,7 +656,8 @@ impl Device {
 		}
 	}
 
-	pub fn open_outstream(&self) -> Result<OutStream> {
+	// TODO: Double check this
+	pub fn open_outstream<CB: 'static + FnMut(&mut StreamWriter)>(&self, write_callback: CB) -> Result<OutStream> {
 		let mut outstream = unsafe { bindings::soundio_outstream_create(self.device) };
 		if outstream == ptr::null_mut() {
 			// Note that we should really abort() here (that's what the rest of Rust
@@ -677,7 +678,7 @@ impl Device {
 		let stream = OutStream {
 			userdata: Box::new( OutStreamUserData {
 				outstream: outstream,
-				write_callback: None,
+				write_callback: Box::new(write_callback),
 				underflow_callback: None,
 				error_callback: None,
 			} ),
@@ -698,18 +699,14 @@ impl Device {
 
 extern fn outstream_write_callback(stream: *mut bindings::SoundIoOutStream, frame_count_min: c_int, frame_count_max: c_int) {
 	// Use stream.userdata to get a reference to the OutStream object.
-	let mut userdata = unsafe { (*stream).userdata as *mut OutStreamUserData };
+	let raw_userdata_pointer = unsafe { (*stream).userdata as *mut OutStreamUserData };
+	let userdata = unsafe { &mut (*raw_userdata_pointer) };
 
-	// TODO: I should convert that pointer to a reference somehow.
-
-	let stream_writer = StreamWriter {
-		outstream: unsafe { (*userdata).outstream },
+	let mut stream_writer = StreamWriter {
+		outstream: userdata.outstream,
 	};
 
-	match unsafe { &mut (*userdata).write_callback } {
-		&mut Some(ref x) => {},//x(stream_writer),
-		&mut None => {},
-	}
+	(userdata.write_callback)(&mut stream_writer);
 }
 
 extern fn outstream_underflow_callback(stream: *mut bindings::SoundIoOutStream) {
@@ -732,7 +729,7 @@ pub struct OutStreamUserData {
 	outstream: *mut bindings::SoundIoOutStream,
 
 	// TODO: Do these need to be thread-safe as write_callback() is called in a different thread?
-	write_callback: Option<Box<FnMut(StreamWriter)>>, // TODO: This shouldn't be an option.
+	write_callback: Box<FnMut(&mut StreamWriter)>, // TODO: This shouldn't be an option.
 	underflow_callback: Option<Box<FnMut()>>,
 	error_callback: Option<Box<FnMut(Error)>>,
 }

@@ -69,9 +69,8 @@ fn run() -> Result<(), String> {
 
 	// What I want to do is something like this:
 
-	let mut output_stream = output_dev.open_outstream(
-	//	my_write_callback,
-
+	let mut output_stream = output_dev.open_outstream::<_>(
+		my_write_callback
 	)?;
 
 	output_stream.start();
