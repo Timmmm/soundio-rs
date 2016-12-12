@@ -11,7 +11,7 @@ use std::fmt;
 use std::error;
 use std::result;
 
-use std::os::raw::{c_int, c_char};
+use std::os::raw::{c_int, c_char, c_void, c_double};
 
 #[derive(Debug, Copy, Clone)]
 pub enum Error {
@@ -335,6 +335,59 @@ pub enum Format {
 	Float64BE, // Float 64 bit Big Endian, Range -1.0 to 1.0
 }
 
+impl From<bindings::SoundIoFormat> for Format {
+    fn from(format: bindings::SoundIoFormat) -> Format {
+		match format {
+			bindings::SoundIoFormat::SoundIoFormatS8 => Format::S8,
+			bindings::SoundIoFormat::SoundIoFormatU8 => Format::U8,
+			bindings::SoundIoFormat::SoundIoFormatS16LE => Format::S16LE,
+			bindings::SoundIoFormat::SoundIoFormatS16BE => Format::S16BE,
+			bindings::SoundIoFormat::SoundIoFormatU16LE => Format::U16LE,
+			bindings::SoundIoFormat::SoundIoFormatU16BE => Format::U16BE,
+			bindings::SoundIoFormat::SoundIoFormatS24LE => Format::S24LE,
+			bindings::SoundIoFormat::SoundIoFormatS24BE => Format::S24BE,
+			bindings::SoundIoFormat::SoundIoFormatU24LE => Format::U24LE,
+			bindings::SoundIoFormat::SoundIoFormatU24BE => Format::U24BE,
+			bindings::SoundIoFormat::SoundIoFormatS32LE => Format::S32LE,
+			bindings::SoundIoFormat::SoundIoFormatS32BE => Format::S32BE,
+			bindings::SoundIoFormat::SoundIoFormatU32LE => Format::U32LE,
+			bindings::SoundIoFormat::SoundIoFormatU32BE => Format::U32BE,
+			bindings::SoundIoFormat::SoundIoFormatFloat32LE => Format::Float32LE,
+			bindings::SoundIoFormat::SoundIoFormatFloat32BE => Format::Float32BE,
+			bindings::SoundIoFormat::SoundIoFormatFloat64LE => Format::Float64LE,
+			bindings::SoundIoFormat::SoundIoFormatFloat64BE => Format::Float64BE,
+			_ => Format::Invalid,
+		}
+    }
+}
+
+impl From<Format> for bindings::SoundIoFormat {
+    fn from(format: Format) -> bindings::SoundIoFormat {
+		match format {
+			Format::S8 => bindings::SoundIoFormat::SoundIoFormatS8,
+			Format::U8 => bindings::SoundIoFormat::SoundIoFormatU8,
+			Format::S16LE => bindings::SoundIoFormat::SoundIoFormatS16LE,
+			Format::S16BE => bindings::SoundIoFormat::SoundIoFormatS16BE,
+			Format::U16LE => bindings::SoundIoFormat::SoundIoFormatU16LE,
+			Format::U16BE => bindings::SoundIoFormat::SoundIoFormatU16BE,
+			Format::S24LE => bindings::SoundIoFormat::SoundIoFormatS24LE,
+			Format::S24BE => bindings::SoundIoFormat::SoundIoFormatS24BE,
+			Format::U24LE => bindings::SoundIoFormat::SoundIoFormatU24LE,
+			Format::U24BE => bindings::SoundIoFormat::SoundIoFormatU24BE,
+			Format::S32LE => bindings::SoundIoFormat::SoundIoFormatS32LE,
+			Format::S32BE => bindings::SoundIoFormat::SoundIoFormatS32BE,
+			Format::U32LE => bindings::SoundIoFormat::SoundIoFormatU32LE,
+			Format::U32BE => bindings::SoundIoFormat::SoundIoFormatU32BE,
+			Format::Float32LE => bindings::SoundIoFormat::SoundIoFormatFloat32LE,
+			Format::Float32BE => bindings::SoundIoFormat::SoundIoFormatFloat32BE,
+			Format::Float64LE => bindings::SoundIoFormat::SoundIoFormatFloat64LE,
+			Format::Float64BE => bindings::SoundIoFormat::SoundIoFormatFloat64BE,
+			_ => bindings::SoundIoFormat::SoundIoFormatInvalid,
+		}
+    }
+}
+
+
 #[derive(Debug)]
 pub struct ChannelLayout {
 	name: String,
@@ -387,7 +440,7 @@ impl Context {
 
 	pub fn set_app_name(&mut self, name: String) {
 		self.app_name = name;
-//		(self.soundio).app_name = ???;
+// 		unsafe { (*self.soundio).app_name = self.app_name.as_bytes() as *mut c_char; } // ?
 	}
 
 	pub fn app_name(&self) -> String {
@@ -484,6 +537,8 @@ impl Context {
 		})
 	}
 
+	// TODO: I should use Result, but then just add another error: FlushNotCalled.
+
 	// Returns Err(()) if you never called flush_events().
 	pub fn input_device_count(&mut self) -> result::Result<usize, ()> {
 		let count = unsafe { bindings::soundio_input_device_count(self.soundio) };
@@ -537,6 +592,18 @@ impl Context {
 		}
 		Ok(devices)
 	}
+
+	// Get all the default input device. If you never called flush_events() it returns Err(()).
+	pub fn default_input_device(&mut self) -> result::Result<Device, ()> {
+		let index = self.default_input_device_index()?;
+		Ok(self.get_input_device(index)?)
+	}
+	
+	// Get all the default output device. If you never called flush_events() it returns Err(()).
+	pub fn default_output_device(&mut self) -> result::Result<Device, ()> {
+		let index = self.default_output_device_index()?;
+		Ok(self.get_output_device(index)?)
+	}
 }
 
 impl Drop for Context {
@@ -546,8 +613,6 @@ impl Drop for Context {
 		}
 	}
 }
-
-
 
 pub struct Device {
 	device: *mut bindings::SoundIoDevice,
@@ -563,35 +628,96 @@ impl Device {
 		unsafe { (*self.device).is_raw != 0 }
 	}
 
-	pub fn sort_channel_layouts(&mut self) {
+	pub fn sort_channel_layouts(&self) {
 		unsafe {
 			bindings::soundio_device_sort_channel_layouts(self.device);
 		}
 	}
 
-	pub fn supports_format(&mut self, format: Format) -> bool {
-		false
+	pub fn supports_format(&self, format: Format) -> bool {
+		unsafe {
+			bindings::soundio_device_supports_format(self.device, format.into()) != 0
+		}
 	}
 
 	// pub fn supports_layout(&mut self, layout: Layout) -> bool {
 	// 	false
 	// }
 
-	pub fn supports_sample_rate(&mut self, sample_rate: i32) -> bool {
-		false
+	pub fn supports_sample_rate(&self, sample_rate: i32) -> bool {
+		unsafe {
+			bindings::soundio_device_supports_sample_rate(self.device, sample_rate as c_int) != 0
+		}
 	}
 
-	pub fn nearest_sample_rate(&mut self, sample_rate: i32) -> i32 {
-		0
+	pub fn nearest_sample_rate(&self, sample_rate: i32) -> i32 {
+		unsafe {
+			bindings::soundio_device_nearest_sample_rate(self.device, sample_rate as c_int) as i32
+		}
+	}
+
+	pub fn open_outstream(&self) -> Result<OutStream> {
+		let mut outstream = unsafe { bindings::soundio_outstream_create(self.device) };
+		if outstream == ptr::null_mut() {
+			// Note that we should really abort() here (that's what the rest of Rust
+			// does on OOM), but there is no stable way to abort in Rust that I can see.
+			panic!("soundio_outstream_create() failed (out of memory).");
+		}
+
+//		outstream.sample_rate = ?;
+//		outstream.format = ?;
+//		outstream.layout = ?;
+		unsafe {
+			(*outstream).software_latency = 0.0; // ?
+			(*outstream).write_callback = outstream_write_callback as *mut _;
+			(*outstream).underflow_callback = outstream_underflow_callback as *mut _;
+			(*outstream).error_callback = outstream_error_callback as *mut _;
+		}
+
+		let stream = OutStream {
+			userdata: Box::new( OutStreamUserData {
+				outstream: outstream,
+				write_callback: None,
+				underflow_callback: None,
+				error_callback: None,
+			} ),
+		};
+
+		match unsafe { bindings::soundio_outstream_open(stream.userdata.outstream) } {
+			0 => {},
+			x => return Err(x.into()),
+		};
+		
+		Ok(stream)
 	}
 /*
-	pub fn create_outstream(&mut self) -> OutStream {
-
-	}
-
-	pub fn create_instream(&mut self) -> InStream {
+	pub fn open_instream(&mut self) -> InStream {
 
 	}*/
+}
+
+extern fn outstream_write_callback(stream: *mut bindings::SoundIoOutStream, frame_count_min: c_int, frame_count_max: c_int) {
+	// Use stream.userdata to get a reference to the OutStream object.
+	let mut userdata = unsafe { (*stream).userdata as *mut OutStreamUserData };
+
+	// TODO: I should convert that pointer to a reference somehow.
+
+	let stream_writer = StreamWriter {
+		outstream: unsafe { (*userdata).outstream },
+	};
+
+	match unsafe { &mut (*userdata).write_callback } {
+		&mut Some(ref x) => {},//x(stream_writer),
+		&mut None => {},
+	}
+}
+
+extern fn outstream_underflow_callback(stream: *mut bindings::SoundIoOutStream) {
+
+}
+
+extern fn outstream_error_callback(stream: *mut bindings::SoundIoOutStream, err: c_int) {
+
 }
 
 impl Drop for Device {
@@ -602,46 +728,120 @@ impl Drop for Device {
 	}
 }
 
+pub struct OutStreamUserData {
+	outstream: *mut bindings::SoundIoOutStream,
+
+	// TODO: Do these need to be thread-safe as write_callback() is called in a different thread?
+	write_callback: Option<Box<FnMut(StreamWriter)>>, // TODO: This shouldn't be an option.
+	underflow_callback: Option<Box<FnMut()>>,
+	error_callback: Option<Box<FnMut(Error)>>,
+}
+
+impl Drop for OutStreamUserData {
+	fn drop(&mut self) {
+		unsafe {
+			bindings::soundio_outstream_destroy(self.outstream);
+		}
+	}
+}
 
 pub struct OutStream {
-	outstream: *mut bindings::SoundIoOutStream,
+	userdata: Box<OutStreamUserData>,
 }
 
 // Outstream; copy this for instream.
 impl OutStream {
-	pub fn open(&mut self) -> Result<()> {
-		Ok(())
-	}
 	pub fn start(&mut self) -> Result<()> {
-		Ok(())
-	}
-	// Can only be called from the write_callback thread context.
-	pub fn begin_write(&mut self) -> Result<()> {
-		Ok(())
-	}
-	// Can only be called from the write_callback thread context.
-	// TODO: In order to enforce that maybe I create another object and pass that object to the callback. 
-	pub fn end_write(&mut self) -> Result<()> {
-		Ok(())
+		match unsafe { bindings::soundio_outstream_start(self.userdata.outstream) } {
+			0 => Ok(()),
+			x => Err(x.into()),
+		}
 	}
 
 	pub fn clear_buffer(&mut self) -> Result<()> {
-		Ok(())
+		match unsafe { bindings::soundio_outstream_clear_buffer(self.userdata.outstream) } {
+			0 => Ok(()),
+			e => Err(e.into()),
+		}
 	}
 
 	pub fn pause(&mut self, pause: bool) -> Result<()> {
-		Ok(())
+		match unsafe { bindings::soundio_outstream_pause(self.userdata.outstream, pause as i8) } {
+			0 => Ok(()),
+			e => Err(e.into()),
+		}
+	}
+/*		Can only be called from the write_callback context so it should be in the object passed to that function.
+	pub fn get_latency(&mut self) -> Result<f64> {
+		let mut x: c_double = 0.0;
+
+		match unsafe { bindings::soundio_outstream_get_latency(self.outstream, &mut x as *mut c_double) } {
+			0 => Ok(x),
+			e => Err(e.into()),
+		}
+	}*/
+}
+
+
+
+pub struct StreamWriter {
+	outstream: *mut bindings::SoundIoOutStream,
+}
+
+impl StreamWriter {
+	// Begin write consumes this object so you can only call it once.
+	// frame_count is the number of frames you want to write. It must be between
+	// frame_count_min and frame_count_max.
+	pub fn begin_write(self, frame_count: i32) -> Result<ChannelAreas> {
+		let mut areas: *mut bindings::SoundIoChannelArea = ptr::null_mut();
+		let mut actual_frame_count: c_int = frame_count;
+
+		match unsafe { bindings::soundio_outstream_begin_write(self.outstream, &mut areas as *mut _, &mut actual_frame_count as *mut _) } {
+			0 => Ok( ChannelAreas {
+				outstream: self.outstream,
+				frame_count: actual_frame_count,
+				areas: vec![],
+			} ),
+			e => Err(e.into()),
+		}
 	}
 
-	pub fn get_latency(&mut self) -> Result<f64> {
-		Ok(1.0)
+	pub fn frame_count_min() -> i32 {
+		0
+	}
+
+	pub fn frame_count_max() -> i32 {
+		0
+	}
+
+	pub fn software_latency() -> f64 {
+		0.0
 	}
 }
 
-impl Drop for OutStream {
+pub struct ChannelAreas {
+	outstream: *mut bindings::SoundIoOutStream,
+	frame_count: i32,
+
+	// The memory area to write to - one for each channel.
+	areas: Vec<bindings::SoundIoChannelArea>,
+}
+
+impl ChannelAreas {
+	pub fn frame_count(&self) -> i32 {
+		self.frame_count
+	}
+
+	// Get the slice which we can write to.
+	// pub fn get_slice(&mut self, channel: i32) -> &mut [T] {
+	// 	std::slice::from_raw_parts_mut(...)
+	// }
+}
+
+impl Drop for ChannelAreas {
 	fn drop(&mut self) {
 		unsafe {
-			bindings::soundio_outstream_destroy(self.outstream);
+			bindings::soundio_outstream_end_write(self.outstream);
 		}
 	}
 }

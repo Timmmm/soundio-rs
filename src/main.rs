@@ -1,6 +1,14 @@
 extern crate soundio;
 
 
+fn my_write_callback(stream: &mut soundio::StreamWriter) {
+	// let channel_areas = stream.get_channel_areas();
+	// let channel_left = channel_areas[0];
+	// for i in 0..channel_left.size() {
+	// 	channel_left[i] = rand();
+	// }
+}
+
 // Print sound soundio debug info and play back a sound.
 fn run() -> Result<(), String> {
 
@@ -43,14 +51,36 @@ fn run() -> Result<(), String> {
 	println!("Output device count: {}", ctx.output_device_count().unwrap_or(0));
 
 	let output_devices = ctx.output_devices().map_err(|_| "Error getting output devices".to_string())?;
+	let input_devices = ctx.input_devices().map_err(|_| "Error getting input devices".to_string())?;
+
+
 
 	for dev in output_devices {
 		println!("Output device: {} {}", dev.name(), if dev.is_raw() { "raw" } else { "cooked" } );
 	}
 
+	for dev in input_devices {
+		println!("Input device: {} {}", dev.name(), if dev.is_raw() { "raw" } else { "cooked" } );
+	}
+
+	let output_dev = ctx.default_output_device().map_err(|_| "Error getting default output device".to_string())?;
+
+	println!("Default output device: {} {}", output_dev.name(), if output_dev.is_raw() { "raw" } else { "cooked" } );
+
+	// What I want to do is something like this:
+
+	let mut output_stream = output_dev.open_outstream(
+	//	my_write_callback,
+
+	)?;
+
+	output_stream.start();
+
+	loop {
+		ctx.wait_events();
+	}
+
 	Ok(())
-
-
 }
 
 fn main() {
