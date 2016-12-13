@@ -1,19 +1,13 @@
 #![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 
 use bindings;
 
-use super::*;
+use super::types::*;
+use super::util::*;
+use super::outstream::*;
 
-use std;
-use std::mem;
-use std::ffi::CStr;
 use std::ptr;
-use std::fmt;
-use std::error;
-use std::result;
-use std::os::raw::{c_int, c_char, c_void, c_double};
+use std::os::raw::c_int;
 
 pub struct Device {
 	pub device: *mut bindings::SoundIoDevice,
@@ -41,8 +35,10 @@ impl Device {
 		}
 	}
 
-	// pub fn supports_layout(&mut self, layout: Layout) -> bool {
-	// 	false
+	// pub fn supports_layout(&mut self, layout: ChannelLayout) -> bool {
+	// 	unsafe {
+	// 		bindings::soundio_device_supports_layout(self.device, layout.into()) != 0
+	// 	}
 	// }
 
 	pub fn supports_sample_rate(&self, sample_rate: i32) -> bool {
@@ -58,10 +54,11 @@ impl Device {
 	}
 
 	// TODO: Double check this
+	// TODO: Outstream needs to have a lifetime less than this.
 	pub fn open_outstream<CB: 'static + FnMut(&mut StreamWriter)>(&self,
-			// sample_rate: i32,
-			// format: Format,
-			// layout: Layout,
+			sample_rate: i32,
+			format: Format,
+//			layout: Layout,
 			write_callback: CB) -> Result<OutStream> {
 		let mut outstream = unsafe { bindings::soundio_outstream_create(self.device) };
 		if outstream == ptr::null_mut() {
@@ -70,10 +67,10 @@ impl Device {
 			panic!("soundio_outstream_create() failed (out of memory).");
 		}
 
-		// outstream.sample_rate = sample_rate;
-		// outstream.format = format;
-		// outstream.layout = layout;
 		unsafe {
+			(*outstream).sample_rate = sample_rate;
+			(*outstream).format = format.into();
+	//		(*outstream).layout = layout;
 			(*outstream).software_latency = 0.0; // ?
 			(*outstream).write_callback = outstream_write_callback as *mut _;
 			(*outstream).underflow_callback = outstream_underflow_callback as *mut _;
@@ -98,13 +95,16 @@ impl Device {
 			0 => {},
 			x => return Err(x.into()),
 		};
+
+		// TODO: Check layout_error
 		
 		Ok(stream)
 	}
-/*
-	pub fn open_instream(&mut self) -> InStream {
 
-	}*/
+	// TODO: Instream.
+	// pub fn open_instream(&mut self) -> InStream {
+	// 	unimplemented!();
+	// }
 }
 
 impl Drop for Device {

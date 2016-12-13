@@ -1,6 +1,6 @@
 extern crate soundio;
 
-fn my_write_callback(stream: &mut soundio::StreamWriter) {
+fn my_write_callback(_stream: &mut soundio::StreamWriter) {
 	println!("my_write_callback called!");
 	// let channel_areas = stream.get_channel_areas();
 	// let channel_left = channel_areas[0];
@@ -70,6 +70,8 @@ fn run() -> Result<(), String> {
 
 	println!("Opening default output stream");
 	let mut output_stream = output_dev.open_outstream(
+		48000,
+		soundio::Format::Float32LE,
 		my_write_callback
 	)?;
 

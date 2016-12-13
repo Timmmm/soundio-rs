@@ -1,41 +1,58 @@
 #![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 
 use bindings;
 
-use super::*;
+use super::types::*;
+use super::device::*;
 
-use std;
-use std::mem;
-use std::ffi::CStr;
 use std::ptr;
-use std::fmt;
-use std::error;
 use std::result;
-use std::os::raw::{c_int, c_char, c_void, c_double};
+use std::os::raw::c_int;
 
+/// `Context` represents the libsoundio library.
+///
+/// It must be created using `Context::new()` before most operations can be done and you
+/// generally will only have one context object per app.
+///
+/// The underlying C struct is destroyed when this object is dropped, which means that it
+/// must outlive all the Devices it creates. TODO: Enforce this using lifetimes.
+///
+/// # Examples
+///
+/// ```
+/// let mut ctx = soundio::Context::new();
+/// ```
 pub struct Context {
 	// The soundio library instance.
 	soundio: *mut bindings::SoundIo,
 	app_name: String,
 }
 
-extern fn on_backend_disconnect(sio: *mut bindings::SoundIo, err: c_int) {
+extern fn on_backend_disconnect(_sio: *mut bindings::SoundIo, err: c_int) {
+	// TODO: Allow user-defined callback.
 	println!("Backend disconnected: {}", Error::from(err));
 }
 
-extern fn on_devices_change(sio: *mut bindings::SoundIo, err: c_int) {
-	println!("Backend disconnected: {}", Error::from(err));
+extern fn on_devices_change(_sio: *mut bindings::SoundIo) {
+	println!("Devices changed");
 }
 
 impl Context {
 
+	/// Create a new libsoundio context.
+	///
+	/// This panics if libsoundio fails to create the context object. This only happens due to out-of-memory conditions
+	/// and Rust also panics (aborts actually) under those conditions in the standard library so this behaviour seemed acceptable.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = soundio::Context::new();
+	/// ```
 	pub fn new() -> Context {
 		let soundio = unsafe { bindings::soundio_create() };
 		if soundio == ptr::null_mut() {
-			// Note that we should really abort() here (that's what the rest of Rust
-			// does on OOM), but there is no stable way to abort in Rust that I can see.
+			// TODO: abort() here instead of panicking.
 			panic!("soundio_create() failed (out of memory).");
 		}
 
@@ -43,25 +60,30 @@ impl Context {
 			soundio: soundio,
 			app_name: String::new(),
 		};
-//		(*context.soundio).userdata = &context;
+		// TODO: Save a reference here so that we can have user-defined callbacks (see OutStreamUserData).
+		//   (*context.soundio).userdata = &context;
 
-		// Note that the default on_backend_disconnect() handler panics! We'll change that.
+		// Note that libsoundio's default on_backend_disconnect() handler panics!
 		unsafe {
 			(*context.soundio).on_backend_disconnect = on_backend_disconnect as *mut extern fn(*mut bindings::SoundIo, i32);
-//			(*context.soundio).on_devices_change = on_devices_change as 
+			(*context.soundio).on_devices_change = on_devices_change as *mut extern fn(*mut bindings::SoundIo);
 		}
 		context
 	}
 
+	/// Set the app name. This is shown in JACK and some other backends. Any colons are stripped. The max length is ? and the default is ?.
 	pub fn set_app_name(&mut self, name: String) {
 		self.app_name = name;
-// 		unsafe { (*self.soundio).app_name = self.app_name.as_bytes() as *mut c_char; } // ?
+		// TODO: Actually set the app name in libsoundio. I need to understand lifetimes more for that...
+		//	unsafe { (*self.soundio).app_name = self.app_name.as_bytes() as *mut c_char; } // ?
 	}
 
+	/// Get the app name previously set by `set_app_name()`. 
 	pub fn app_name(&self) -> String {
 		self.app_name.clone()
 	}
 
+	/// Connect to the default backend.
 	pub fn connect(&mut self) -> Result<()> {
 		let ret = unsafe { bindings::soundio_connect(self.soundio) };
 		match ret {
@@ -70,6 +92,7 @@ impl Context {
 		}
 	}
 
+	/// Connect to the specified backend.
 	pub fn connect_backend(&mut self, backend: Backend) -> Result<()> {
 		let ret = unsafe { bindings::soundio_connect_backend(self.soundio, backend.into()) };
 		match ret {
@@ -78,20 +101,22 @@ impl Context {
 		}
 	}
 
+	/// Disconnect from the current backend. Does nothing (TODO: Check) if no backend is connected.
 	pub fn disconnect(&mut self) {
 		unsafe {
 			bindings::soundio_disconnect(self.soundio);
 		}
 	}
 
+	/// Return the current `Backend`, which may be `Backend::None`.
 	pub fn current_backend(&mut self) -> Backend {
 		unsafe {
 			(*self.soundio).current_backend.into()
 		}
 	}
 
+	/// Return a list of available backends on this system.
 	pub fn available_backends(&mut self) -> Vec<Backend> {
-		// TODO: Use soundio_backend_count() and soundio_get_backend().
 		let count = unsafe { bindings::soundio_backend_count(self.soundio) };
 		let mut backends = Vec::with_capacity(count as usize);
 		for i in 0..count {
@@ -100,19 +125,22 @@ impl Context {
 		backends
 	}
 
-	// You have to call this before enumerating devices.
+	/// Flush events. This must be called before enumerating devices.
 	pub fn flush_events(&mut self) {
 		unsafe {
 			bindings::soundio_flush_events(self.soundio);
 		}
 	}
 
+	/// Wait for events. Call this in a loop.
 	pub fn wait_events(&mut self) {
 		unsafe {
 			bindings::soundio_wait_events(self.soundio);
 		}
 	}
 
+	/// Wake up any other threads calling wait_events().
+	/// TODO: For this to work, Context must be Send.
 	pub fn wakeup(&mut self) {
 		unsafe {
 			bindings::soundio_wakeup(self.soundio);
@@ -126,10 +154,10 @@ impl Context {
 	}
 
 
-	// Devices
+	// Get a device, or None if the index is out of bounds or you never called flush_events()
+	// (you have to call flush_events() before getting devices).
 
-	// Get a device, or None() if the index is out of bounds or you never called flush_events()
-	// (you have to call flush_events() before getting devices)
+	// TODO: Device must have a lifetime less than Context.
 	pub fn get_input_device(&mut self, index: usize) -> result::Result<Device, ()> {
 		let device = unsafe { bindings::soundio_get_input_device(self.soundio, index as c_int) };
 		if device == ptr::null_mut() {
@@ -153,6 +181,7 @@ impl Context {
 	}
 
 	// TODO: I should use Result, but then just add another error: FlushNotCalled.
+	// Or maybe just panic?
 
 	// Returns Err(()) if you never called flush_events().
 	pub fn input_device_count(&mut self) -> result::Result<usize, ()> {

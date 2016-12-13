@@ -4,6 +4,8 @@
 
 use bindings;
 
+use super::util::*;
+
 use std::mem;
 use std::ffi::CStr;
 use std::ptr;
@@ -220,6 +222,162 @@ pub enum ChannelId {
 }
 
 
+
+
+impl From<bindings::SoundIoChannelId> for ChannelId {
+    fn from(channel_id: bindings::SoundIoChannelId) -> ChannelId {
+		match channel_id {
+			bindings::SoundIoChannelId::SoundIoChannelIdFrontLeft => ChannelId::FrontLeft,
+			bindings::SoundIoChannelId::SoundIoChannelIdFrontRight => ChannelId::FrontRight,
+			bindings::SoundIoChannelId::SoundIoChannelIdFrontCenter => ChannelId::FrontCenter,
+			bindings::SoundIoChannelId::SoundIoChannelIdLfe => ChannelId::Lfe,
+			bindings::SoundIoChannelId::SoundIoChannelIdBackLeft => ChannelId::BackLeft,
+			bindings::SoundIoChannelId::SoundIoChannelIdBackRight => ChannelId::BackRight,
+			bindings::SoundIoChannelId::SoundIoChannelIdFrontLeftCenter => ChannelId::FrontLeftCenter,
+			bindings::SoundIoChannelId::SoundIoChannelIdFrontRightCenter => ChannelId::FrontRightCenter,
+			bindings::SoundIoChannelId::SoundIoChannelIdBackCenter => ChannelId::BackCenter,
+			bindings::SoundIoChannelId::SoundIoChannelIdSideLeft => ChannelId::SideLeft,
+			bindings::SoundIoChannelId::SoundIoChannelIdSideRight => ChannelId::SideRight,
+			bindings::SoundIoChannelId::SoundIoChannelIdTopCenter => ChannelId::TopCenter,
+			bindings::SoundIoChannelId::SoundIoChannelIdTopFrontLeft => ChannelId::TopFrontLeft,
+			bindings::SoundIoChannelId::SoundIoChannelIdTopFrontCenter => ChannelId::TopFrontCenter,
+			bindings::SoundIoChannelId::SoundIoChannelIdTopFrontRight => ChannelId::TopFrontRight,
+			bindings::SoundIoChannelId::SoundIoChannelIdTopBackLeft => ChannelId::TopBackLeft,
+			bindings::SoundIoChannelId::SoundIoChannelIdTopBackCenter => ChannelId::TopBackCenter,
+			bindings::SoundIoChannelId::SoundIoChannelIdTopBackRight  => ChannelId::TopBackRight ,
+			bindings::SoundIoChannelId::SoundIoChannelIdBackLeftCenter => ChannelId::BackLeftCenter,
+			bindings::SoundIoChannelId::SoundIoChannelIdBackRightCenter => ChannelId::BackRightCenter,
+			bindings::SoundIoChannelId::SoundIoChannelIdFrontLeftWide => ChannelId::FrontLeftWide,
+			bindings::SoundIoChannelId::SoundIoChannelIdFrontRightWide => ChannelId::FrontRightWide,
+			bindings::SoundIoChannelId::SoundIoChannelIdFrontLeftHigh => ChannelId::FrontLeftHigh,
+			bindings::SoundIoChannelId::SoundIoChannelIdFrontCenterHigh => ChannelId::FrontCenterHigh,
+			bindings::SoundIoChannelId::SoundIoChannelIdFrontRightHigh => ChannelId::FrontRightHigh,
+			bindings::SoundIoChannelId::SoundIoChannelIdTopFrontLeftCenter => ChannelId::TopFrontLeftCenter,
+			bindings::SoundIoChannelId::SoundIoChannelIdTopFrontRightCenter => ChannelId::TopFrontRightCenter,
+			bindings::SoundIoChannelId::SoundIoChannelIdTopSideLeft => ChannelId::TopSideLeft,
+			bindings::SoundIoChannelId::SoundIoChannelIdTopSideRight => ChannelId::TopSideRight,
+			bindings::SoundIoChannelId::SoundIoChannelIdLeftLfe => ChannelId::LeftLfe,
+			bindings::SoundIoChannelId::SoundIoChannelIdRightLfe => ChannelId::RightLfe,
+			bindings::SoundIoChannelId::SoundIoChannelIdLfe2 => ChannelId::Lfe2,
+			bindings::SoundIoChannelId::SoundIoChannelIdBottomCenter => ChannelId::BottomCenter,
+			bindings::SoundIoChannelId::SoundIoChannelIdBottomLeftCenter => ChannelId::BottomLeftCenter,
+			bindings::SoundIoChannelId::SoundIoChannelIdBottomRightCenter => ChannelId::BottomRightCenter,
+			bindings::SoundIoChannelId::SoundIoChannelIdMsMid => ChannelId::MsMid,
+			bindings::SoundIoChannelId::SoundIoChannelIdMsSide => ChannelId::MsSide,
+			bindings::SoundIoChannelId::SoundIoChannelIdAmbisonicW => ChannelId::AmbisonicW,
+			bindings::SoundIoChannelId::SoundIoChannelIdAmbisonicX => ChannelId::AmbisonicX,
+			bindings::SoundIoChannelId::SoundIoChannelIdAmbisonicY => ChannelId::AmbisonicY,
+			bindings::SoundIoChannelId::SoundIoChannelIdAmbisonicZ => ChannelId::AmbisonicZ,
+			bindings::SoundIoChannelId::SoundIoChannelIdXyX => ChannelId::XyX,
+			bindings::SoundIoChannelId::SoundIoChannelIdXyY => ChannelId::XyY,
+			bindings::SoundIoChannelId::SoundIoChannelIdHeadphonesLeft => ChannelId::HeadphonesLeft,
+			bindings::SoundIoChannelId::SoundIoChannelIdHeadphonesRight => ChannelId::HeadphonesRight,
+			bindings::SoundIoChannelId::SoundIoChannelIdClickTrack => ChannelId::ClickTrack,
+			bindings::SoundIoChannelId::SoundIoChannelIdForeignLanguage => ChannelId::ForeignLanguage,
+			bindings::SoundIoChannelId::SoundIoChannelIdHearingImpaired => ChannelId::HearingImpaired,
+			bindings::SoundIoChannelId::SoundIoChannelIdNarration => ChannelId::Narration,
+			bindings::SoundIoChannelId::SoundIoChannelIdHaptic => ChannelId::Haptic,
+			bindings::SoundIoChannelId::SoundIoChannelIdDialogCentricMix  => ChannelId::DialogCentricMix ,
+			bindings::SoundIoChannelId::SoundIoChannelIdAux => ChannelId::Aux,
+			bindings::SoundIoChannelId::SoundIoChannelIdAux0 => ChannelId::Aux0,
+			bindings::SoundIoChannelId::SoundIoChannelIdAux1 => ChannelId::Aux1,
+			bindings::SoundIoChannelId::SoundIoChannelIdAux2 => ChannelId::Aux2,
+			bindings::SoundIoChannelId::SoundIoChannelIdAux3 => ChannelId::Aux3,
+			bindings::SoundIoChannelId::SoundIoChannelIdAux4 => ChannelId::Aux4,
+			bindings::SoundIoChannelId::SoundIoChannelIdAux5 => ChannelId::Aux5,
+			bindings::SoundIoChannelId::SoundIoChannelIdAux6 => ChannelId::Aux6,
+			bindings::SoundIoChannelId::SoundIoChannelIdAux7 => ChannelId::Aux7,
+			bindings::SoundIoChannelId::SoundIoChannelIdAux8 => ChannelId::Aux8,
+			bindings::SoundIoChannelId::SoundIoChannelIdAux9 => ChannelId::Aux9,
+			bindings::SoundIoChannelId::SoundIoChannelIdAux10 => ChannelId::Aux10,
+			bindings::SoundIoChannelId::SoundIoChannelIdAux11 => ChannelId::Aux11,
+			bindings::SoundIoChannelId::SoundIoChannelIdAux12 => ChannelId::Aux12,
+			bindings::SoundIoChannelId::SoundIoChannelIdAux13 => ChannelId::Aux13,
+			bindings::SoundIoChannelId::SoundIoChannelIdAux14 => ChannelId::Aux14,
+			bindings::SoundIoChannelId::SoundIoChannelIdAux15 => ChannelId::Aux15,
+			_ => ChannelId::Invalid,
+		}
+    }
+}
+
+impl From<ChannelId> for bindings::SoundIoChannelId {
+    fn from(channel_id: ChannelId) -> bindings::SoundIoChannelId {
+		match channel_id {
+			ChannelId::FrontLeft => bindings::SoundIoChannelId::SoundIoChannelIdFrontLeft,
+			ChannelId::FrontRight => bindings::SoundIoChannelId::SoundIoChannelIdFrontRight,
+			ChannelId::FrontCenter => bindings::SoundIoChannelId::SoundIoChannelIdFrontCenter,
+			ChannelId::Lfe => bindings::SoundIoChannelId::SoundIoChannelIdLfe,
+			ChannelId::BackLeft => bindings::SoundIoChannelId::SoundIoChannelIdBackLeft,
+			ChannelId::BackRight => bindings::SoundIoChannelId::SoundIoChannelIdBackRight,
+			ChannelId::FrontLeftCenter => bindings::SoundIoChannelId::SoundIoChannelIdFrontLeftCenter,
+			ChannelId::FrontRightCenter => bindings::SoundIoChannelId::SoundIoChannelIdFrontRightCenter,
+			ChannelId::BackCenter => bindings::SoundIoChannelId::SoundIoChannelIdBackCenter,
+			ChannelId::SideLeft => bindings::SoundIoChannelId::SoundIoChannelIdSideLeft,
+			ChannelId::SideRight => bindings::SoundIoChannelId::SoundIoChannelIdSideRight,
+			ChannelId::TopCenter => bindings::SoundIoChannelId::SoundIoChannelIdTopCenter,
+			ChannelId::TopFrontLeft => bindings::SoundIoChannelId::SoundIoChannelIdTopFrontLeft,
+			ChannelId::TopFrontCenter => bindings::SoundIoChannelId::SoundIoChannelIdTopFrontCenter,
+			ChannelId::TopFrontRight => bindings::SoundIoChannelId::SoundIoChannelIdTopFrontRight,
+			ChannelId::TopBackLeft => bindings::SoundIoChannelId::SoundIoChannelIdTopBackLeft,
+			ChannelId::TopBackCenter => bindings::SoundIoChannelId::SoundIoChannelIdTopBackCenter,
+			ChannelId::TopBackRight  => bindings::SoundIoChannelId::SoundIoChannelIdTopBackRight ,
+			ChannelId::BackLeftCenter => bindings::SoundIoChannelId::SoundIoChannelIdBackLeftCenter,
+			ChannelId::BackRightCenter => bindings::SoundIoChannelId::SoundIoChannelIdBackRightCenter,
+			ChannelId::FrontLeftWide => bindings::SoundIoChannelId::SoundIoChannelIdFrontLeftWide,
+			ChannelId::FrontRightWide => bindings::SoundIoChannelId::SoundIoChannelIdFrontRightWide,
+			ChannelId::FrontLeftHigh => bindings::SoundIoChannelId::SoundIoChannelIdFrontLeftHigh,
+			ChannelId::FrontCenterHigh => bindings::SoundIoChannelId::SoundIoChannelIdFrontCenterHigh,
+			ChannelId::FrontRightHigh => bindings::SoundIoChannelId::SoundIoChannelIdFrontRightHigh,
+			ChannelId::TopFrontLeftCenter => bindings::SoundIoChannelId::SoundIoChannelIdTopFrontLeftCenter,
+			ChannelId::TopFrontRightCenter => bindings::SoundIoChannelId::SoundIoChannelIdTopFrontRightCenter,
+			ChannelId::TopSideLeft => bindings::SoundIoChannelId::SoundIoChannelIdTopSideLeft,
+			ChannelId::TopSideRight => bindings::SoundIoChannelId::SoundIoChannelIdTopSideRight,
+			ChannelId::LeftLfe => bindings::SoundIoChannelId::SoundIoChannelIdLeftLfe,
+			ChannelId::RightLfe => bindings::SoundIoChannelId::SoundIoChannelIdRightLfe,
+			ChannelId::Lfe2 => bindings::SoundIoChannelId::SoundIoChannelIdLfe2,
+			ChannelId::BottomCenter => bindings::SoundIoChannelId::SoundIoChannelIdBottomCenter,
+			ChannelId::BottomLeftCenter => bindings::SoundIoChannelId::SoundIoChannelIdBottomLeftCenter,
+			ChannelId::BottomRightCenter => bindings::SoundIoChannelId::SoundIoChannelIdBottomRightCenter,
+			ChannelId::MsMid => bindings::SoundIoChannelId::SoundIoChannelIdMsMid,
+			ChannelId::MsSide => bindings::SoundIoChannelId::SoundIoChannelIdMsSide,
+			ChannelId::AmbisonicW => bindings::SoundIoChannelId::SoundIoChannelIdAmbisonicW,
+			ChannelId::AmbisonicX => bindings::SoundIoChannelId::SoundIoChannelIdAmbisonicX,
+			ChannelId::AmbisonicY => bindings::SoundIoChannelId::SoundIoChannelIdAmbisonicY,
+			ChannelId::AmbisonicZ => bindings::SoundIoChannelId::SoundIoChannelIdAmbisonicZ,
+			ChannelId::XyX => bindings::SoundIoChannelId::SoundIoChannelIdXyX,
+			ChannelId::XyY => bindings::SoundIoChannelId::SoundIoChannelIdXyY,
+			ChannelId::HeadphonesLeft => bindings::SoundIoChannelId::SoundIoChannelIdHeadphonesLeft,
+			ChannelId::HeadphonesRight => bindings::SoundIoChannelId::SoundIoChannelIdHeadphonesRight,
+			ChannelId::ClickTrack => bindings::SoundIoChannelId::SoundIoChannelIdClickTrack,
+			ChannelId::ForeignLanguage => bindings::SoundIoChannelId::SoundIoChannelIdForeignLanguage,
+			ChannelId::HearingImpaired => bindings::SoundIoChannelId::SoundIoChannelIdHearingImpaired,
+			ChannelId::Narration => bindings::SoundIoChannelId::SoundIoChannelIdNarration,
+			ChannelId::Haptic => bindings::SoundIoChannelId::SoundIoChannelIdHaptic,
+			ChannelId::DialogCentricMix  => bindings::SoundIoChannelId::SoundIoChannelIdDialogCentricMix ,
+			ChannelId::Aux => bindings::SoundIoChannelId::SoundIoChannelIdAux,
+			ChannelId::Aux0 => bindings::SoundIoChannelId::SoundIoChannelIdAux0,
+			ChannelId::Aux1 => bindings::SoundIoChannelId::SoundIoChannelIdAux1,
+			ChannelId::Aux2 => bindings::SoundIoChannelId::SoundIoChannelIdAux2,
+			ChannelId::Aux3 => bindings::SoundIoChannelId::SoundIoChannelIdAux3,
+			ChannelId::Aux4 => bindings::SoundIoChannelId::SoundIoChannelIdAux4,
+			ChannelId::Aux5 => bindings::SoundIoChannelId::SoundIoChannelIdAux5,
+			ChannelId::Aux6 => bindings::SoundIoChannelId::SoundIoChannelIdAux6,
+			ChannelId::Aux7 => bindings::SoundIoChannelId::SoundIoChannelIdAux7,
+			ChannelId::Aux8 => bindings::SoundIoChannelId::SoundIoChannelIdAux8,
+			ChannelId::Aux9 => bindings::SoundIoChannelId::SoundIoChannelIdAux9,
+			ChannelId::Aux10 => bindings::SoundIoChannelId::SoundIoChannelIdAux10,
+			ChannelId::Aux11 => bindings::SoundIoChannelId::SoundIoChannelIdAux11,
+			ChannelId::Aux12 => bindings::SoundIoChannelId::SoundIoChannelIdAux12,
+			ChannelId::Aux13 => bindings::SoundIoChannelId::SoundIoChannelIdAux13,
+			ChannelId::Aux14 => bindings::SoundIoChannelId::SoundIoChannelIdAux14,
+			ChannelId::Aux15 => bindings::SoundIoChannelId::SoundIoChannelIdAux15,
+			_ => bindings::SoundIoChannelId::SoundIoChannelIdInvalid,
+		}
+    }
+}
+
+
+
 /// Built-in channel layouts for convenience.
 #[derive(Debug, Copy, Clone)]
 pub enum ChannelLayoutId {
@@ -250,6 +408,82 @@ pub enum ChannelLayoutId {
 	C7Point1WideBack,
 	Octagonal,
 }
+
+
+impl From<bindings::SoundIoChannelLayoutId> for ChannelLayoutId {
+    fn from(channel_layout_id: bindings::SoundIoChannelLayoutId) -> ChannelLayoutId {
+		match channel_layout_id {
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutIdMono            => ChannelLayoutId::Mono,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutIdStereo          => ChannelLayoutId::Stereo,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId2Point1         => ChannelLayoutId::C2Point1,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId3Point0         => ChannelLayoutId::C3Point0,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId3Point0Back     => ChannelLayoutId::C3Point0Back,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId3Point1         => ChannelLayoutId::C3Point1,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId4Point0         => ChannelLayoutId::C4Point0,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutIdQuad            => ChannelLayoutId::Quad,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutIdQuadSide        => ChannelLayoutId::QuadSide,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId4Point1         => ChannelLayoutId::C4Point1,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId5Point0Back     => ChannelLayoutId::C5Point0Back,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId5Point0Side     => ChannelLayoutId::C5Point0Side,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId5Point1         => ChannelLayoutId::C5Point1,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId5Point1Back     => ChannelLayoutId::C5Point1Back,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point0Side     => ChannelLayoutId::C6Point0Side,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point0Front    => ChannelLayoutId::C6Point0Front,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutIdHexagonal       => ChannelLayoutId::Hexagonal,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point1         => ChannelLayoutId::C6Point1,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point1Back     => ChannelLayoutId::C6Point1Back,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point1Front    => ChannelLayoutId::C6Point1Front,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point0         => ChannelLayoutId::C7Point0,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point0Front    => ChannelLayoutId::C7Point0Front,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point1         => ChannelLayoutId::C7Point1,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point1Wide     => ChannelLayoutId::C7Point1Wide,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point1WideBack => ChannelLayoutId::C7Point1WideBack,
+			bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutIdOctagonal       => ChannelLayoutId::Octagonal,
+		}
+    }
+}
+
+impl From<ChannelLayoutId> for bindings::SoundIoChannelLayoutId {
+    fn from(channel_layout_id: ChannelLayoutId) -> bindings::SoundIoChannelLayoutId {
+		match channel_layout_id {
+			ChannelLayoutId::Mono             => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutIdMono,
+			ChannelLayoutId::Stereo           => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutIdStereo,
+			ChannelLayoutId::C2Point1         => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId2Point1,
+			ChannelLayoutId::C3Point0         => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId3Point0,
+			ChannelLayoutId::C3Point0Back     => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId3Point0Back,
+			ChannelLayoutId::C3Point1         => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId3Point1,
+			ChannelLayoutId::C4Point0         => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId4Point0,
+			ChannelLayoutId::Quad             => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutIdQuad,
+			ChannelLayoutId::QuadSide         => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutIdQuadSide,
+			ChannelLayoutId::C4Point1         => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId4Point1,
+			ChannelLayoutId::C5Point0Back     => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId5Point0Back,
+			ChannelLayoutId::C5Point0Side     => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId5Point0Side,
+			ChannelLayoutId::C5Point1         => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId5Point1,
+			ChannelLayoutId::C5Point1Back     => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId5Point1Back,
+			ChannelLayoutId::C6Point0Side     => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point0Side,
+			ChannelLayoutId::C6Point0Front    => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point0Front,
+			ChannelLayoutId::Hexagonal        => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutIdHexagonal,
+			ChannelLayoutId::C6Point1         => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point1,
+			ChannelLayoutId::C6Point1Back     => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point1Back,
+			ChannelLayoutId::C6Point1Front    => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point1Front,
+			ChannelLayoutId::C7Point0         => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point0,
+			ChannelLayoutId::C7Point0Front    => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point0Front,
+			ChannelLayoutId::C7Point1         => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point1,
+			ChannelLayoutId::C7Point1Wide     => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point1Wide,
+			ChannelLayoutId::C7Point1WideBack => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point1WideBack,
+			ChannelLayoutId::Octagonal        => bindings::SoundIoChannelLayoutId::SoundIoChannelLayoutIdOctagonal,
+		}
+    }
+}
+
+
+
+
+
+
+
+
+
 
 #[derive(Debug, Copy, Clone)]
 pub enum Backend {
@@ -334,6 +568,8 @@ pub enum Format {
 	Float64BE, // Float 64 bit Big Endian, Range -1.0 to 1.0
 }
 
+// TODO: Add functions / constants for native / foreign endian. 
+
 impl From<bindings::SoundIoFormat> for Format {
     fn from(format: bindings::SoundIoFormat) -> Format {
 		match format {
@@ -392,6 +628,30 @@ pub struct ChannelLayout {
 	pub name: String,
 	pub channels: Vec<ChannelId>,
 }
+
+
+
+// impl From<bindings::SoundIoChannelLayout> for ChannelLayout {
+//     fn from(layout: bindings::SoundIoChannelLayout) -> ChannelLayout {
+// 		ChannelLayout {
+// 			name: latin1_to_string(layout.name),
+// 			channels: ...,
+// 		}
+//     }
+// }
+
+// impl From<ChannelLayout> for bindings::SoundIoChannelLayout {
+//     fn from(layout: ChannelLayout) -> bindings::SoundIoChannelLayout {
+// 		bindings::SoundIoChannelLayout {
+// 			name: ???,
+// 			channel_count: layout.channels.len() as c_int,
+// 			channels: layout.channels...,
+// 		}
+//     }
+// }
+
+
+
 
 #[derive(Debug, Copy, Clone)]
 pub struct SampleRateRange {
