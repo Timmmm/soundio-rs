@@ -246,27 +246,27 @@ pub const SOUNDIO_MAX_CHANNELS: usize = 24;
 // The size of this struct is OK to use.
 #[repr(C)]
 pub struct SoundIoChannelLayout {
-    name: *const c_char,
-    channel_count: c_int,
-    channels: [SoundIoChannelId; SOUNDIO_MAX_CHANNELS],
+    pub name: *const c_char,
+    pub channel_count: c_int,
+    pub channels: [SoundIoChannelId; SOUNDIO_MAX_CHANNELS],
 }
 
 // The size of this struct is OK to use.
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct SoundIoSampleRateRange {
-    min: c_int,
-    max: c_int,
+    pub min: c_int,
+    pub max: c_int,
 }
 
 // The size of this struct is OK to use.
 #[repr(C)]
 pub struct SoundIoChannelArea {
     // Base address of buffer.
-    ptr: *mut c_char,
+    pub ptr: *mut c_char,
     // How many bytes it takes to get from the beginning of one sample to
     // the beginning of the next sample.
-    step: c_int,
+    pub step: c_int,
 }
 
 // The size of this struct is not part of the API or ABI.
