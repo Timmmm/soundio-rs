@@ -657,7 +657,11 @@ impl Device {
 	}
 
 	// TODO: Double check this
-	pub fn open_outstream<CB: 'static + FnMut(&mut StreamWriter)>(&self, write_callback: CB) -> Result<OutStream> {
+	pub fn open_outstream<CB: 'static + FnMut(&mut StreamWriter)>(&self,
+			// sample_rate: i32,
+			// format: Format,
+			// layout: Layout,
+			write_callback: CB) -> Result<OutStream> {
 		let mut outstream = unsafe { bindings::soundio_outstream_create(self.device) };
 		if outstream == ptr::null_mut() {
 			// Note that we should really abort() here (that's what the rest of Rust
@@ -665,9 +669,9 @@ impl Device {
 			panic!("soundio_outstream_create() failed (out of memory).");
 		}
 
-//		outstream.sample_rate = ?;
-//		outstream.format = ?;
-//		outstream.layout = ?;
+		// outstream.sample_rate = sample_rate;
+		// outstream.format = format;
+		// outstream.layout = layout;
 		unsafe {
 			(*outstream).software_latency = 0.0; // ?
 			(*outstream).write_callback = outstream_write_callback as *mut _;
@@ -705,6 +709,8 @@ extern fn outstream_write_callback(stream: *mut bindings::SoundIoOutStream, fram
 	let mut stream_writer = StreamWriter {
 		outstream: userdata.outstream,
 	};
+
+
 
 	(userdata.write_callback)(&mut stream_writer);
 }
@@ -768,15 +774,7 @@ impl OutStream {
 			e => Err(e.into()),
 		}
 	}
-/*		Can only be called from the write_callback context so it should be in the object passed to that function.
-	pub fn get_latency(&mut self) -> Result<f64> {
-		let mut x: c_double = 0.0;
 
-		match unsafe { bindings::soundio_outstream_get_latency(self.outstream, &mut x as *mut c_double) } {
-			0 => Ok(x),
-			e => Err(e.into()),
-		}
-	}*/
 }
 
 
@@ -811,8 +809,18 @@ impl StreamWriter {
 		0
 	}
 
+	// Get latency due to software only, not including hardware.
 	pub fn software_latency() -> f64 {
 		0.0
+	}
+
+	// Can only be called from the write_callback context. This includes both hardware and software latency.
+	pub fn get_latency(&mut self) -> Result<f64> {
+		let mut x: c_double = 0.0;
+		match unsafe { bindings::soundio_outstream_get_latency(self.outstream, &mut x as *mut c_double) } {
+			0 => Ok(x),
+			e => Err(e.into()),
+		}
 	}
 }
 
@@ -830,9 +838,22 @@ impl ChannelAreas {
 	}
 
 	// Get the slice which we can write to.
-	// pub fn get_slice(&mut self, channel: i32) -> &mut [T] {
-	// 	std::slice::from_raw_parts_mut(...)
-	// }
+	// T is the slice type they want.
+	// TODO: Panic if the format is wrong?
+	// TODO: Also panic if the step is not equal to sizeof(T).
+	// TODO: Otherwise maybe we have to use a slice of structs, where the structs are
+	// packet and have padding to take them up to step?
+	pub fn get_slice<T>(&mut self, channel: i32) -> &mut [T] {
+		assert_eq!(self.areas[channel as usize].step, mem::size_of::<T>());
+
+		unsafe {
+			std::slice::from_raw_parts_mut(self.areas[channel as usize].ptr as *mut T, self.frame_count as usize)
+		}
+	}
+
+	pub fn get_step(&mut self, channel: i32) -> i32 {
+		self.areas[channel as usize].step as i32
+	}
 }
 
 impl Drop for ChannelAreas {
