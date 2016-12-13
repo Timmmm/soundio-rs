@@ -1,6 +1,7 @@
 extern crate soundio;
 
 fn my_write_callback(stream: &mut soundio::StreamWriter) {
+	println!("my_write_callback called!");
 	// let channel_areas = stream.get_channel_areas();
 	// let channel_left = channel_areas[0];
 	// for i in 0..channel_left.size() {
@@ -67,17 +68,18 @@ fn run() -> Result<(), String> {
 
 	// What I want to do is something like this:
 
+	println!("Opening default output stream");
 	let mut output_stream = output_dev.open_outstream(
 		my_write_callback
 	)?;
 
-	output_stream.start();
+	println!("Starting stream");
+	output_stream.start()?;
 
 	loop {
+		println!("Waiting for events...");
 		ctx.wait_events();
 	}
-
-	Ok(())
 }
 
 fn main() {

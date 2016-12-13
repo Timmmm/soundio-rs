@@ -115,8 +115,6 @@ impl fmt::Display for Error {
 // Implement the description for errors using soundio_strerror(), and the cause which we never know.
 impl error::Error for Error {
 	fn description(&self) -> &str {
-		// TODO: I'm sure there is a simpler way than .clone().into(). I thought that by doing #[derive(Copy)]
-		// it would automatically clone it...
 		let c_str: &CStr = unsafe { CStr::from_ptr(bindings::soundio_strerror((*self).into())) };
 
 		// TODO: to_str() checks for valid UTF-8 since that what a &str is. Is it safe to assume
@@ -221,6 +219,7 @@ pub enum ChannelId {
 	Aux15,
 }
 
+
 /// Built-in channel layouts for convenience.
 #[derive(Debug, Copy, Clone)]
 pub enum ChannelLayoutId {
@@ -295,7 +294,7 @@ impl fmt::Display for Backend {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		// TODO: This may be overkill - I could just use the #[derive(Debug)] output; it's nearly identical.
 
-		let c_str: &CStr = unsafe { CStr::from_ptr(bindings::soundio_backend_name(self.clone().into())) };
+		let c_str: &CStr = unsafe { CStr::from_ptr(bindings::soundio_backend_name((*self).into())) };
 
 		// TODO: to_str() checks for valid UTF-8 since that what a &str is. Is it safe to assume
 		// soundio_strerror() never returns invalid UTF-8?
@@ -390,12 +389,12 @@ impl From<Format> for bindings::SoundIoFormat {
 
 #[derive(Debug)]
 pub struct ChannelLayout {
-	name: String,
-	channels: Vec<ChannelId>,
+	pub name: String,
+	pub channels: Vec<ChannelId>,
 }
 
 #[derive(Debug, Copy, Clone)]
 pub struct SampleRateRange {
-	min: i32,
-	max: i32,
+	pub min: i32,
+	pub max: i32,
 }

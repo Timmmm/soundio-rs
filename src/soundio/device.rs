@@ -1,0 +1,116 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+
+use bindings;
+
+use super::*;
+
+use std;
+use std::mem;
+use std::ffi::CStr;
+use std::ptr;
+use std::fmt;
+use std::error;
+use std::result;
+use std::os::raw::{c_int, c_char, c_void, c_double};
+
+pub struct Device {
+	pub device: *mut bindings::SoundIoDevice,
+}
+
+impl Device {
+
+	pub fn name(&self) -> String {
+		latin1_to_string(unsafe { (*self.device).name } )
+	}
+
+	pub fn is_raw(&self) -> bool {
+		unsafe { (*self.device).is_raw != 0 }
+	}
+
+	pub fn sort_channel_layouts(&self) {
+		unsafe {
+			bindings::soundio_device_sort_channel_layouts(self.device);
+		}
+	}
+
+	pub fn supports_format(&self, format: Format) -> bool {
+		unsafe {
+			bindings::soundio_device_supports_format(self.device, format.into()) != 0
+		}
+	}
+
+	// pub fn supports_layout(&mut self, layout: Layout) -> bool {
+	// 	false
+	// }
+
+	pub fn supports_sample_rate(&self, sample_rate: i32) -> bool {
+		unsafe {
+			bindings::soundio_device_supports_sample_rate(self.device, sample_rate as c_int) != 0
+		}
+	}
+
+	pub fn nearest_sample_rate(&self, sample_rate: i32) -> i32 {
+		unsafe {
+			bindings::soundio_device_nearest_sample_rate(self.device, sample_rate as c_int) as i32
+		}
+	}
+
+	// TODO: Double check this
+	pub fn open_outstream<CB: 'static + FnMut(&mut StreamWriter)>(&self,
+			// sample_rate: i32,
+			// format: Format,
+			// layout: Layout,
+			write_callback: CB) -> Result<OutStream> {
+		let mut outstream = unsafe { bindings::soundio_outstream_create(self.device) };
+		if outstream == ptr::null_mut() {
+			// Note that we should really abort() here (that's what the rest of Rust
+			// does on OOM), but there is no stable way to abort in Rust that I can see.
+			panic!("soundio_outstream_create() failed (out of memory).");
+		}
+
+		// outstream.sample_rate = sample_rate;
+		// outstream.format = format;
+		// outstream.layout = layout;
+		unsafe {
+			(*outstream).software_latency = 0.0; // ?
+			(*outstream).write_callback = outstream_write_callback as *mut _;
+			(*outstream).underflow_callback = outstream_underflow_callback as *mut _;
+			(*outstream).error_callback = outstream_error_callback as *mut _;
+		}
+
+		let mut stream = OutStream {
+			userdata: Box::new( OutStreamUserData {
+				outstream: outstream,
+				write_callback: Box::new(write_callback),
+				underflow_callback: None,
+				error_callback: None,
+			} ),
+		};
+
+		// Safe userdata pointer.
+		unsafe {
+			(*stream.userdata.outstream).userdata = stream.userdata.as_mut() as *mut OutStreamUserData as *mut _;
+		}
+
+		match unsafe { bindings::soundio_outstream_open(stream.userdata.outstream) } {
+			0 => {},
+			x => return Err(x.into()),
+		};
+		
+		Ok(stream)
+	}
+/*
+	pub fn open_instream(&mut self) -> InStream {
+
+	}*/
+}
+
+impl Drop for Device {
+	fn drop(&mut self) {
+		unsafe {
+			bindings::soundio_device_unref(self.device);
+		}
+	}
+}
