@@ -221,9 +221,6 @@ pub enum ChannelId {
 	Aux15,
 }
 
-
-
-
 impl From<bindings::SoundIoChannelId> for ChannelId {
     fn from(channel_id: bindings::SoundIoChannelId) -> ChannelId {
 		match channel_id {
@@ -383,7 +380,7 @@ impl From<ChannelId> for bindings::SoundIoChannelId {
 pub enum ChannelLayoutId {
 	Mono,
 	Stereo,
-	C2Point1,
+	C2Point1, // Ignore the 'C'. It's just there because it can't start with a number.
 	C3Point0,
 	C3Point0Back,
 	C3Point1,
@@ -477,14 +474,6 @@ impl From<ChannelLayoutId> for bindings::SoundIoChannelLayoutId {
 }
 
 
-
-
-
-
-
-
-
-
 #[derive(Debug, Copy, Clone)]
 pub enum Backend {
 	None,
@@ -538,9 +527,28 @@ impl fmt::Display for Backend {
 	}
 }
 
+#[derive(Debug, Copy, Clone)]
 pub enum DeviceAim {
 	Input,  // capture / recording
 	Output, // playback
+}
+
+impl From<bindings::SoundIoDeviceAim> for DeviceAim {
+    fn from(aim: bindings::SoundIoDeviceAim) -> DeviceAim {
+		match aim {
+			bindings::SoundIoDeviceAim::SoundIoDeviceAimInput => DeviceAim::Input,
+			bindings::SoundIoDeviceAim::SoundIoDeviceAimOutput => DeviceAim::Output,
+		}
+    }
+}
+
+impl From<DeviceAim> for bindings::SoundIoDeviceAim {
+    fn from(aim: DeviceAim) -> bindings::SoundIoDeviceAim {
+		match aim {
+			DeviceAim::Input => bindings::SoundIoDeviceAim::SoundIoDeviceAimInput,
+			DeviceAim::Output => bindings::SoundIoDeviceAim::SoundIoDeviceAimOutput,
+		}
+    }
 }
 
 /// For your convenience, Native Endian and Foreign Endian constants are defined
