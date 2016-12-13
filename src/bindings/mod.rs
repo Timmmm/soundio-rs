@@ -3,6 +3,7 @@
 extern crate libc;
 
 use std::os::raw::{c_char, c_void, c_int, c_double};
+
 // There is no c_bool, but you can use Rust's i8 or bool instead.
 // See https://github.com/rust-lang/rfcs/pull/954#issuecomment-169820630
 #[allow(non_camel_case_types)]

@@ -1,6 +1,5 @@
 extern crate soundio;
 
-
 fn my_write_callback(stream: &mut soundio::StreamWriter) {
 	// let channel_areas = stream.get_channel_areas();
 	// let channel_left = channel_areas[0];
@@ -11,7 +10,6 @@ fn my_write_callback(stream: &mut soundio::StreamWriter) {
 
 // Print sound soundio debug info and play back a sound.
 fn run() -> Result<(), String> {
-
 
 	println!("Soundio version: {}", soundio::version_string());
 
