@@ -33,7 +33,7 @@ fn run() -> Result<(), String> {
 
 	println!("InitAudioBackend error: {}", soundio::Error::InitAudioBackend);
 
-	let mut ctx = soundio::Context::new();
+	let mut ctx = soundio::Context::new("Test App");
 
 	println!("Available backends: {:?}", ctx.available_backends());
 

@@ -5,15 +5,24 @@ use bindings;
 use super::types::*;
 use super::util::*;
 use super::outstream::*;
+use super::context::*;
 
 use std::ptr;
 use std::os::raw::c_int;
+use std::marker::PhantomData;
 
-pub struct Device {
+pub struct Device<'a> {
 	pub device: *mut bindings::SoundIoDevice,
+
+	// This is just here to say that Device cannot outlive the Context it was created from.
+	pub phantom: PhantomData<&'a Context>,
 }
 
-impl Device {
+/// Device represents an input or output device.
+///
+/// It is obtained from a `Context` using `Context::get_input_device()` or `Context::get_output_device()`.
+/// You can use it to open an input stream or output stream. 
+impl<'a> Device<'a> {
 
 	pub fn name(&self) -> String {
 		latin1_to_string(unsafe { (*self.device).name } )
@@ -55,6 +64,7 @@ impl Device {
 
 	// TODO: Double check this
 	// TODO: Outstream needs to have a lifetime less than this.
+	// TODO: Include underflow and error callbacks.
 	pub fn open_outstream<CB: 'static + FnMut(&mut StreamWriter)>(&self,
 			sample_rate: i32,
 			format: Format,
@@ -84,6 +94,7 @@ impl Device {
 				underflow_callback: None,
 				error_callback: None,
 			} ),
+			phantom: PhantomData,
 		};
 
 		// Safe userdata pointer.
@@ -107,7 +118,7 @@ impl Device {
 	// }
 }
 
-impl Drop for Device {
+impl<'a> Drop for Device<'a> {
 	fn drop(&mut self) {
 		unsafe {
 			bindings::soundio_device_unref(self.device);

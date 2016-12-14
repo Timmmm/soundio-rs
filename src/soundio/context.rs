@@ -8,6 +8,7 @@ use super::device::*;
 use std::ptr;
 use std::result;
 use std::os::raw::c_int;
+use std::marker::PhantomData;
 
 /// `Context` represents the libsoundio library.
 ///
@@ -49,7 +50,7 @@ impl Context {
 	/// ```
 	/// let mut ctx = soundio::Context::new();
 	/// ```
-	pub fn new() -> Context {
+	pub fn new(app_name: &str) -> Context {
 		let soundio = unsafe { bindings::soundio_create() };
 		if soundio == ptr::null_mut() {
 			// TODO: abort() here instead of panicking.
@@ -58,8 +59,10 @@ impl Context {
 
 		let context = Context { 
 			soundio: soundio,
-			app_name: String::new(),
+			app_name: app_name.to_string(),
 		};
+		// TODO: Set app name in soundio.app_name.
+
 		// TODO: Save a reference here so that we can have user-defined callbacks (see OutStreamUserData).
 		//   (*context.soundio).userdata = &context;
 
@@ -109,14 +112,14 @@ impl Context {
 	}
 
 	/// Return the current `Backend`, which may be `Backend::None`.
-	pub fn current_backend(&mut self) -> Backend {
+	pub fn current_backend(&self) -> Backend {
 		unsafe {
 			(*self.soundio).current_backend.into()
 		}
 	}
 
 	/// Return a list of available backends on this system.
-	pub fn available_backends(&mut self) -> Vec<Backend> {
+	pub fn available_backends(&self) -> Vec<Backend> {
 		let count = unsafe { bindings::soundio_backend_count(self.soundio) };
 		let mut backends = Vec::with_capacity(count as usize);
 		for i in 0..count {
@@ -126,14 +129,14 @@ impl Context {
 	}
 
 	/// Flush events. This must be called before enumerating devices.
-	pub fn flush_events(&mut self) {
+	pub fn flush_events(&self) {
 		unsafe {
 			bindings::soundio_flush_events(self.soundio);
 		}
 	}
 
 	/// Wait for events. Call this in a loop.
-	pub fn wait_events(&mut self) {
+	pub fn wait_events(&self) {
 		unsafe {
 			bindings::soundio_wait_events(self.soundio);
 		}
@@ -141,13 +144,13 @@ impl Context {
 
 	/// Wake up any other threads calling wait_events().
 	/// TODO: For this to work, Context must be Send.
-	pub fn wakeup(&mut self) {
+	pub fn wakeup(&self) {
 		unsafe {
 			bindings::soundio_wakeup(self.soundio);
 		}
 	}
 
-	pub fn force_device_scan(&mut self) {
+	pub fn force_device_scan(&self) {
 		unsafe {
 			bindings::soundio_force_device_scan(self.soundio);
 		}
@@ -157,26 +160,29 @@ impl Context {
 	// Get a device, or None if the index is out of bounds or you never called flush_events()
 	// (you have to call flush_events() before getting devices).
 
-	// TODO: Device must have a lifetime less than Context.
-	pub fn get_input_device(&mut self, index: usize) -> result::Result<Device, ()> {
+	// TODO: Device must have a lifetime less than Context. Only references had lifetimes, so maybe I need to either return a &Device, or have a reference in it.
+	// Probably the latter? If I keep a reference to this object in it then it will have to stay around as long.
+	pub fn get_input_device(&self, index: usize) -> result::Result<Device, ()> {
 		let device = unsafe { bindings::soundio_get_input_device(self.soundio, index as c_int) };
 		if device == ptr::null_mut() {
 			return Err(());
 		}
 
 		Ok(Device {
-			device: device
+			device: device,
+			phantom: PhantomData,
 		})
 	}
 
-	pub fn get_output_device(&mut self, index: usize) -> result::Result<Device, ()> {
+	pub fn get_output_device(&self, index: usize) -> result::Result<Device, ()> {
 		let device = unsafe { bindings::soundio_get_output_device(self.soundio, index as c_int) };
 		if device == ptr::null_mut() {
 			return Err(());
 		}
 
 		Ok(Device {
-			device: device
+			device: device,
+			phantom: PhantomData,
 		})
 	}
 
@@ -184,7 +190,7 @@ impl Context {
 	// Or maybe just panic?
 
 	// Returns Err(()) if you never called flush_events().
-	pub fn input_device_count(&mut self) -> result::Result<usize, ()> {
+	pub fn input_device_count(&self) -> result::Result<usize, ()> {
 		let count = unsafe { bindings::soundio_input_device_count(self.soundio) };
 		match count {
 			-1 => Err(()),
@@ -192,7 +198,7 @@ impl Context {
 		}
 	}
 
-	pub fn output_device_count(&mut self) -> result::Result<usize, ()> {
+	pub fn output_device_count(&self) -> result::Result<usize, ()> {
 		let count = unsafe { bindings::soundio_output_device_count(self.soundio) };
 		match count {
 			-1 => Err(()),
@@ -201,7 +207,7 @@ impl Context {
 	}
 	
 	// Returns None if you never called flush_events().
-	pub fn default_input_device_index(&mut self) -> result::Result<usize, ()> {
+	pub fn default_input_device_index(&self) -> result::Result<usize, ()> {
 		let index = unsafe { bindings::soundio_default_input_device_index(self.soundio) };
 		match index {
 			-1 => Err(()),
@@ -209,7 +215,7 @@ impl Context {
 		}
 	}
 
-	pub fn default_output_device_index(&mut self) -> result::Result<usize, ()> {
+	pub fn default_output_device_index(&self) -> result::Result<usize, ()> {
 		let index = unsafe { bindings::soundio_default_output_device_index(self.soundio) };
 		match index {
 			-1 => Err(()),
@@ -218,7 +224,7 @@ impl Context {
 	}
 
 	// Get all the input devices. If you never called flush_events() it returns Err(()).
-	pub fn input_devices(&mut self) -> result::Result<Vec<Device>, ()> {
+	pub fn input_devices(&self) -> result::Result<Vec<Device>, ()> {
 		let count = self.input_device_count()?;
 		let mut devices = Vec::new();
 		for i in 0..count {
@@ -228,7 +234,7 @@ impl Context {
 	}
 
 	// Get all the output devices. If you never called flush_events() it returns Err(()).
-	pub fn output_devices(&mut self) -> result::Result<Vec<Device>, ()> {
+	pub fn output_devices(&self) -> result::Result<Vec<Device>, ()> {
 		let count = self.output_device_count()?;
 		let mut devices = Vec::new();
 		for i in 0..count {
@@ -238,13 +244,13 @@ impl Context {
 	}
 
 	// Get all the default input device. If you never called flush_events() it returns Err(()).
-	pub fn default_input_device(&mut self) -> result::Result<Device, ()> {
+	pub fn default_input_device(&self) -> result::Result<Device, ()> {
 		let index = self.default_input_device_index()?;
 		Ok(self.get_input_device(index)?)
 	}
 	
 	// Get all the default output device. If you never called flush_events() it returns Err(()).
-	pub fn default_output_device(&mut self) -> result::Result<Device, ()> {
+	pub fn default_output_device(&self) -> result::Result<Device, ()> {
 		let index = self.default_output_device_index()?;
 		Ok(self.get_output_device(index)?)
 	}

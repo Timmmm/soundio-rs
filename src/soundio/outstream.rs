@@ -4,7 +4,8 @@
 
 use bindings;
 
-use super::*;
+use super::types::*;
+use super::device::*;
 
 use std;
 use std::mem;
@@ -14,6 +15,7 @@ use std::fmt;
 use std::error;
 use std::result;
 use std::os::raw::{c_int, c_char, c_void, c_double};
+use std::marker::PhantomData;
 
 /// OutStream Callbacks
 ///
@@ -52,8 +54,11 @@ pub extern fn outstream_error_callback(stream: *mut bindings::SoundIoOutStream, 
 ///
 
 
-pub struct OutStream {
+pub struct OutStream<'a> {
 	pub userdata: Box<OutStreamUserData>,
+	
+	// This is just here to say that OutStream cannot outlive the Device it was created from.
+	pub phantom: PhantomData<&'a Device<'a>>,
 }
 
 pub struct OutStreamUserData {
@@ -74,7 +79,7 @@ impl Drop for OutStreamUserData {
 }
 
 // Outstream; copy this for instream.
-impl OutStream {
+impl<'a> OutStream<'a> {
 	pub fn start(&mut self) -> Result<()> {
 		match unsafe { bindings::soundio_outstream_start(self.userdata.outstream) } {
 			0 => Ok(()),
