@@ -139,7 +139,7 @@ impl From<Error> for String {
 }
 
 /// Specifies where a channel is physically located.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ChannelId {
 	Invalid,
 
@@ -389,7 +389,7 @@ impl fmt::Display for ChannelId {
 
 
 /// Built-in channel layouts for convenience.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ChannelLayoutId {
 	Mono,
 	Stereo,
@@ -488,7 +488,7 @@ impl From<ChannelLayoutId> for bindings::SoundIoChannelLayoutId {
 
 
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Backend {
 	None,
 	Jack,
@@ -541,7 +541,7 @@ impl fmt::Display for Backend {
 	}
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum DeviceAim {
 	Input,  // capture / recording
 	Output, // playback
@@ -567,7 +567,7 @@ impl From<DeviceAim> for bindings::SoundIoDeviceAim {
 
 /// For your convenience, Native Endian and Foreign Endian constants are defined
 /// which point to the respective SoundIoFormat values.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Format {
 	Invalid,
 	S8,        // Signed 8 bit
@@ -687,37 +687,42 @@ impl From<bindings::SoundIoChannelLayout> for ChannelLayout {
     }
 }
 
-// TODO: I need to use a PhantomData with a lifetime the same as layout.name... Except layout is consumed so I don't think
-// this can work at all.
-
-// impl From<ChannelLayout> for bindings::SoundIoChannelLayout {
-//     fn from(layout: ChannelLayout) -> bindings::SoundIoChannelLayout {
-// 		bindings::SoundIoChannelLayout {
-// 			name: ???,
-// 			channel_count: layout.channels.len() as c_int,
-// 			channels: layout.channels...,
-// 		}
-//     }
-// }
-
-impl ChannelLayout {
-	pub fn into_native(&self) -> bindings::SoundIoChannelLayout {
+impl From<ChannelLayout> for bindings::SoundIoChannelLayout {
+    fn from(layout: ChannelLayout) -> bindings::SoundIoChannelLayout {
 		bindings::SoundIoChannelLayout {
-			name: self.name.as_ptr() as *const c_char, // TODO: This should probably be Latin1, but I doubt it will cause issues.
-			channel_count: self.channels.len() as c_int,
+			name: ptr::null(),
+			channel_count: layout.channels.len() as c_int,
 			channels: {
 				let mut c = [bindings::SoundIoChannelId::SoundIoChannelIdInvalid; bindings::SOUNDIO_MAX_CHANNELS];
-				for i in 0..min(c.len(), self.channels.len()) {
-					c[i] = self.channels[i].into();
+				for i in 0..min(c.len(), layout.channels.len()) {
+					c[i] = layout.channels[i].into();
 				}
 				c
 			},
 		}
-	}
+    }
 }
 
+// impl ChannelLayout {
+// 	// I have this function too because it lets you set the name.
+// 	pub fn into_native(&self) -> bindings::SoundIoChannelLayout {
+// 		bindings::SoundIoChannelLayout {
+// 			// TODO: I probably need a PhantomData here...
+// 			name: self.name.as_ptr() as *const c_char, // TODO: This should probably be Latin1, but I doubt it will cause issues.
+// 			channel_count: self.channels.len() as c_int,
+// 			channels: {
+// 				let mut c = [bindings::SoundIoChannelId::SoundIoChannelIdInvalid; bindings::SOUNDIO_MAX_CHANNELS];
+// 				for i in 0..min(c.len(), self.channels.len()) {
+// 					c[i] = self.channels[i].into();
+// 				}
+// 				c
+// 			},
+// 		}
+// 	}
+// }
 
 
+// TODO: Just use the standard range objects?
 #[derive(Debug, Copy, Clone)]
 pub struct SampleRateRange {
 	pub min: i32,

@@ -30,17 +30,21 @@ pub extern fn outstream_write_callback(stream: *mut bindings::SoundIoOutStream, 
 
 	let mut stream_writer = StreamWriter {
 		outstream: userdata.outstream,
+		frame_count_min: frame_count_min as _,
+		frame_count_max: frame_count_max as _,
 	};
 
 	(userdata.write_callback)(&mut stream_writer);
 }
 
 pub extern fn outstream_underflow_callback(stream: *mut bindings::SoundIoOutStream) {
-	unimplemented!();
+//	unimplemented!();
+	println!("Outstream Underflow");
 }
 
 pub extern fn outstream_error_callback(stream: *mut bindings::SoundIoOutStream, err: c_int) {
-	unimplemented!();
+//	unimplemented!();
+	println!("Outstream Error: {}", Error::from(err))
 }
 
 
@@ -116,13 +120,15 @@ impl<'a> OutStream<'a> {
 
 pub struct StreamWriter {
 	outstream: *mut bindings::SoundIoOutStream,
+	frame_count_min: i32,
+	frame_count_max: i32,
 }
 
 impl StreamWriter {
-	// Begin write consumes this object so you can only call it once.
+	// TODO: Somehow restrict this so you can't call it twice? Or just check that dynamically.
 	// frame_count is the number of frames you want to write. It must be between
 	// frame_count_min and frame_count_max.
-	pub fn begin_write(self, frame_count: i32) -> Result<ChannelAreas> {
+	pub fn begin_write(&self, frame_count: i32) -> Result<ChannelAreas> {
 		let mut areas: *mut bindings::SoundIoChannelArea = ptr::null_mut();
 		let mut actual_frame_count: c_int = frame_count;
 
@@ -136,17 +142,19 @@ impl StreamWriter {
 		}
 	}
 
-	pub fn frame_count_min() -> i32 {
-		0
+	pub fn frame_count_min(&self) -> i32 {
+		self.frame_count_min
 	}
 
-	pub fn frame_count_max() -> i32 {
-		0
+	pub fn frame_count_max(&self) -> i32 {
+		self.frame_count_max
 	}
 
 	// Get latency due to software only, not including hardware.
-	pub fn software_latency() -> f64 {
-		0.0
+	pub fn software_latency(&self) -> f64 {
+		unsafe {
+			(*self.outstream).software_latency as _
+		}
 	}
 
 	// Can only be called from the write_callback context. This includes both hardware and software latency.

@@ -47,7 +47,7 @@ impl<'a> Device<'a> {
 	pub fn supports_layout(&mut self, layout: ChannelLayout) -> bool {
 		unsafe {
 			// TODO: Check this cast is ok.
-			bindings::soundio_device_supports_layout(self.device, &layout.into_native() as *const _) != 0
+			bindings::soundio_device_supports_layout(self.device, &layout.into() as *const _) != 0
 		}
 	}
 
@@ -81,7 +81,7 @@ impl<'a> Device<'a> {
 		unsafe {
 			(*outstream).sample_rate = sample_rate;
 			(*outstream).format = format.into();
-//			(*outstream).layout = layout.into();
+			(*outstream).layout = layout.into();
 			(*outstream).software_latency = 0.0; // ?
 			(*outstream).write_callback = outstream_write_callback as *mut _;
 			(*outstream).underflow_callback = outstream_underflow_callback as *mut _;

@@ -8,6 +8,7 @@ mod outstream;
 mod util;
 mod layout;
 
+// TODO: Don't re-export everything.
 pub use self::types::*;
 pub use self::context::*;
 pub use self::device::*;

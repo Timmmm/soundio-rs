@@ -246,8 +246,9 @@ pub const SOUNDIO_MAX_CHANNELS: usize = 24;
 
 // The size of this struct is OK to use.
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub struct SoundIoChannelLayout {
-    pub name: *const c_char,
+    pub name: *const c_char, // Note that Copy and Clone are ok because this normally points to an internal static string. I think.
     pub channel_count: c_int,
     pub channels: [SoundIoChannelId; SOUNDIO_MAX_CHANNELS],
 }
