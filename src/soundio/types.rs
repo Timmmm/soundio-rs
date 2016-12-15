@@ -639,14 +639,17 @@ pub struct ChannelLayout {
 
 
 
-// impl From<bindings::SoundIoChannelLayout> for ChannelLayout {
-//     fn from(layout: bindings::SoundIoChannelLayout) -> ChannelLayout {
-// 		ChannelLayout {
-// 			name: latin1_to_string(layout.name),
-// 			channels: ...,
-// 		}
-//     }
-// }
+impl From<bindings::SoundIoChannelLayout> for ChannelLayout {
+    fn from(layout: bindings::SoundIoChannelLayout) -> ChannelLayout {
+		ChannelLayout {
+			name: latin1_to_string(layout.name),
+			channels: layout.channels.iter().take(layout.channel_count as usize).map(|&x| x.into()).collect(),
+		}
+    }
+}
+
+// TODO: I need to use a PhantomData with a lifetime the same as layout.name... Except layout is consumed so I don't think
+// this can work at all.
 
 // impl From<ChannelLayout> for bindings::SoundIoChannelLayout {
 //     fn from(layout: ChannelLayout) -> bindings::SoundIoChannelLayout {
