@@ -12,6 +12,7 @@ use std::ptr;
 use std::fmt;
 use std::error;
 use std::result;
+use std::cmp::min;
 
 use std::os::raw::{c_int, c_char, c_void, c_double};
 
@@ -374,6 +375,18 @@ impl From<ChannelId> for bindings::SoundIoChannelId {
 }
 
 
+impl fmt::Display for ChannelId {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		let c_str: &CStr = unsafe { CStr::from_ptr(bindings::soundio_get_channel_name((*self).into())) };
+
+		// TODO: to_str() checks for valid UTF-8 since that what a &str is. Is it safe to assume
+		// soundio_strerror() never returns invalid UTF-8?
+		
+		use std::error::Error;
+		f.write_str(c_str.to_str().unwrap())
+	}
+}
+
 
 /// Built-in channel layouts for convenience.
 #[derive(Debug, Copy, Clone)]
@@ -472,6 +485,7 @@ impl From<ChannelLayoutId> for bindings::SoundIoChannelLayoutId {
 		}
     }
 }
+
 
 
 #[derive(Debug, Copy, Clone)]
@@ -630,6 +644,31 @@ impl From<Format> for bindings::SoundIoFormat {
     }
 }
 
+impl Format {
+	pub fn bytes_per_sample(&self) -> i32 {
+		unsafe { bindings::soundio_get_bytes_per_sample((*self).into()) as i32 }
+	}
+	pub fn bytes_per_frame(&self, channel_count: i32) -> i32 {
+		self.bytes_per_sample() * channel_count
+	}
+	pub fn bytes_per_second(&self, channel_count: i32, sample_rate: i32) -> i32 {
+		self.bytes_per_sample() * channel_count * sample_rate
+	}
+}
+
+impl fmt::Display for Format {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		let c_str: &CStr = unsafe { CStr::from_ptr(bindings::soundio_format_string((*self).into())) };
+
+		// TODO: to_str() checks for valid UTF-8 since that what a &str is. Is it safe to assume
+		// soundio_strerror() never returns invalid UTF-8?
+		
+		use std::error::Error;
+		f.write_str(c_str.to_str().unwrap())
+	}
+}
+
+
 
 #[derive(Debug)]
 pub struct ChannelLayout {
@@ -661,6 +700,21 @@ impl From<bindings::SoundIoChannelLayout> for ChannelLayout {
 //     }
 // }
 
+impl ChannelLayout {
+	pub fn into_native(&self) -> bindings::SoundIoChannelLayout {
+		bindings::SoundIoChannelLayout {
+			name: self.name.as_ptr() as *const c_char, // TODO: This should probably be Latin1, but I doubt it will cause issues.
+			channel_count: self.channels.len() as c_int,
+			channels: {
+				let mut c = [bindings::SoundIoChannelId::SoundIoChannelIdInvalid; bindings::SOUNDIO_MAX_CHANNELS];
+				for i in 0..min(c.len(), self.channels.len()) {
+					c[i] = self.channels[i].into();
+				}
+				c
+			},
+		}
+	}
+}
 
 
 

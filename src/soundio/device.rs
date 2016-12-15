@@ -44,11 +44,12 @@ impl<'a> Device<'a> {
 		}
 	}
 
-	// pub fn supports_layout(&mut self, layout: ChannelLayout) -> bool {
-	// 	unsafe {
-	// 		bindings::soundio_device_supports_layout(self.device, layout.into()) != 0
-	// 	}
-	// }
+	pub fn supports_layout(&mut self, layout: ChannelLayout) -> bool {
+		unsafe {
+			// TODO: Check this cast is ok.
+			bindings::soundio_device_supports_layout(self.device, &layout.into_native() as *const _) != 0
+		}
+	}
 
 	pub fn supports_sample_rate(&self, sample_rate: i32) -> bool {
 		unsafe {
@@ -68,7 +69,7 @@ impl<'a> Device<'a> {
 	pub fn open_outstream<CB: 'static + FnMut(&mut StreamWriter)>(&self,
 			sample_rate: i32,
 			format: Format,
-//			layout: Layout,
+			layout: ChannelLayout,
 			write_callback: CB) -> Result<OutStream> {
 		let mut outstream = unsafe { bindings::soundio_outstream_create(self.device) };
 		if outstream == ptr::null_mut() {
@@ -80,7 +81,7 @@ impl<'a> Device<'a> {
 		unsafe {
 			(*outstream).sample_rate = sample_rate;
 			(*outstream).format = format.into();
-	//		(*outstream).layout = layout;
+//			(*outstream).layout = layout.into();
 			(*outstream).software_latency = 0.0; // ?
 			(*outstream).write_callback = outstream_write_callback as *mut _;
 			(*outstream).underflow_callback = outstream_underflow_callback as *mut _;

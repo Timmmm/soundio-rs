@@ -72,6 +72,7 @@ fn run() -> Result<(), String> {
 	let mut output_stream = output_dev.open_outstream(
 		48000,
 		soundio::Format::Float32LE,
+		soundio::ChannelLayout::get_default(),
 		my_write_callback
 	)?;
 

@@ -6,6 +6,7 @@ mod device;
 mod instream;
 mod outstream;
 mod util;
+mod layout;
 
 pub use self::types::*;
 pub use self::context::*;
@@ -13,6 +14,7 @@ pub use self::device::*;
 pub use self::instream::*;
 pub use self::outstream::*;
 pub use self::util::*;
+pub use self::layout::*;
 
 use bindings;
 
