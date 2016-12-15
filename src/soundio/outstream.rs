@@ -16,6 +16,7 @@ use std::error;
 use std::result;
 use std::os::raw::{c_int, c_char, c_void, c_double};
 use std::marker::PhantomData;
+use std::slice;
 
 /// OutStream Callbacks
 ///
@@ -56,7 +57,6 @@ pub extern fn outstream_error_callback(stream: *mut bindings::SoundIoOutStream, 
 ///
 ///
 ///
-
 
 pub struct OutStream<'a> {
 	pub userdata: Box<OutStreamUserData>,
@@ -139,7 +139,11 @@ impl StreamWriter {
 			0 => Ok( ChannelAreas {
 				outstream: self.outstream,
 				frame_count: actual_frame_count,
-				areas: unsafe { Vec::from_raw_parts(areas, self.channel_count(), self.channel_count()) },
+				areas: unsafe { 
+					let mut a = vec![bindings::SoundIoChannelArea { ptr: ptr::null_mut(), step: 0 }; self.channel_count()];
+					a.copy_from_slice(slice::from_raw_parts::<bindings::SoundIoChannelArea>(areas, self.channel_count()));
+					a
+				},
 			} ),
 			e => Err(e.into()),
 		}
@@ -195,8 +199,14 @@ pub struct ChannelAreas {
 }
 
 impl ChannelAreas {
-	pub fn frame_count(&self) -> i32 {
-		self.frame_count
+	pub fn frame_count(&self) -> usize { // TODO: Decide whether channels, frames, etc. should be usize or i32.
+		self.frame_count as _
+	}
+
+	pub fn channel_count(&self) -> usize {
+		unsafe {
+			(*self.outstream).layout.channel_count as _
+		}
 	}
 
 	// Get the slice which we can write to.
@@ -206,6 +216,7 @@ impl ChannelAreas {
 	// TODO: Otherwise maybe we have to use a slice of structs, where the structs are
 	// packet and have padding to take them up to step?
 	pub fn get_slice<T>(&mut self, channel: i32) -> &mut [T] {
+		// TODO: This fails because the channels are interleaved. I'm not quite sure how to handle that.
 		assert_eq!(self.areas[channel as usize].step as usize, std::mem::size_of::<T>());
 
 		unsafe {
@@ -216,12 +227,26 @@ impl ChannelAreas {
 	pub fn get_step(&mut self, channel: i32) -> i32 {
 		self.areas[channel as usize].step as i32
 	}
+
+	// Set the value of a sample/channel. Panics if out of range.
+	pub fn set_sample<T>(&mut self, channel: usize, frame: usize, sample: T) {
+		assert!(channel < self.channel_count(), "Channel out of range");
+		assert!(frame < self.frame_count(), "Frame out of range");
+
+		unsafe {
+			let ptr = self.areas[channel].ptr.offset((frame * self.areas[channel].step as usize) as isize) as *mut T;
+			*ptr = sample;
+		}
+	}
 }
 
 impl Drop for ChannelAreas {
 	fn drop(&mut self) {
 		unsafe {
-			bindings::soundio_outstream_end_write(self.outstream);
+			match bindings::soundio_outstream_end_write(self.outstream) {
+				0 => {},
+				x => panic!("Error writing outstream: {}", Error::from(x)),
+			}
 		}
 	}
 }

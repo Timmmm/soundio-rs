@@ -1,7 +1,8 @@
 extern crate soundio;
+extern crate rand;
 
 fn my_write_callback(stream: &mut soundio::StreamWriter) {
-	println!("my_write_callback called!");
+	println!("my_write_callback called! Min/max frames: {}, {}; latency: {}", stream.frame_count_min(), stream.frame_count_max(), stream.get_latency().unwrap_or(-1.0));
 	let mut channel_areas = match stream.begin_write(stream.frame_count_max()) {
 		Ok(x) => x,
 		Err(e) => {
@@ -10,10 +11,16 @@ fn my_write_callback(stream: &mut soundio::StreamWriter) {
 		}
 	};
 
-	let mut channel_left = channel_areas.get_slice(0);
-	for i in 0..channel_left.len() {
-		channel_left[i] = 0;
+	for c in 0..channel_areas.channel_count() {
+		for f in 0..channel_areas.frame_count() {
+			channel_areas.set_sample(c, f, rand::random::<f32>());
+		}
 	}
+
+	// let mut channel_left = channel_areas.get_slice(0);
+	// for i in 0..channel_left.len() {
+	// 	channel_left[i] = 0;
+	// }
 }
 
 // Print sound soundio debug info and play back a sound.
@@ -97,8 +104,10 @@ fn run() -> Result<(), String> {
 	println!("Starting stream");
 	output_stream.start()?;
 
-	for _ in 0..2 {
+	loop {
+		println!("wait_events");
 		ctx.wait_events();
+		println!("waited");
 	}
 
 	Ok(())

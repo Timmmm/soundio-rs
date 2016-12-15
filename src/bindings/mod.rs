@@ -263,6 +263,7 @@ pub struct SoundIoSampleRateRange {
 
 // The size of this struct is OK to use.
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub struct SoundIoChannelArea {
     // Base address of buffer.
     pub ptr: *mut c_char,
