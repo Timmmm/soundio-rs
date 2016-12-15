@@ -119,34 +119,37 @@ impl<'a> OutStream<'a> {
 ///
 
 pub struct StreamWriter {
+	// TODO: Add PhantomData...
+
 	outstream: *mut bindings::SoundIoOutStream,
-	frame_count_min: i32,
-	frame_count_max: i32,
+	frame_count_min: usize,
+	frame_count_max: usize,
+
 }
 
 impl StreamWriter {
 	// TODO: Somehow restrict this so you can't call it twice? Or just check that dynamically.
 	// frame_count is the number of frames you want to write. It must be between
 	// frame_count_min and frame_count_max.
-	pub fn begin_write(&self, frame_count: i32) -> Result<ChannelAreas> {
+	pub fn begin_write(&self, frame_count: usize) -> Result<ChannelAreas> {
 		let mut areas: *mut bindings::SoundIoChannelArea = ptr::null_mut();
-		let mut actual_frame_count: c_int = frame_count;
+		let mut actual_frame_count: c_int = frame_count as _;
 
 		match unsafe { bindings::soundio_outstream_begin_write(self.outstream, &mut areas as *mut _, &mut actual_frame_count as *mut _) } {
 			0 => Ok( ChannelAreas {
 				outstream: self.outstream,
 				frame_count: actual_frame_count,
-				areas: vec![],
+				areas: unsafe { Vec::from_raw_parts(areas, self.channel_count(), self.channel_count()) },
 			} ),
 			e => Err(e.into()),
 		}
 	}
 
-	pub fn frame_count_min(&self) -> i32 {
+	pub fn frame_count_min(&self) -> usize {
 		self.frame_count_min
 	}
 
-	pub fn frame_count_max(&self) -> i32 {
+	pub fn frame_count_max(&self) -> usize {
 		self.frame_count_max
 	}
 
@@ -154,6 +157,12 @@ impl StreamWriter {
 	pub fn software_latency(&self) -> f64 {
 		unsafe {
 			(*self.outstream).software_latency as _
+		}
+	}
+
+	pub fn channel_count(&self) -> usize {
+		unsafe {
+			(*self.outstream).layout.channel_count as usize
 		}
 	}
 

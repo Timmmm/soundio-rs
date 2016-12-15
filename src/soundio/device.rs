@@ -82,7 +82,7 @@ impl<'a> Device<'a> {
 			(*outstream).sample_rate = sample_rate;
 			(*outstream).format = format.into();
 			(*outstream).layout = layout.into();
-			(*outstream).software_latency = 0.0; // ?
+			(*outstream).software_latency = 0.0; // TODO: What do I put here?
 			(*outstream).write_callback = outstream_write_callback as *mut _;
 			(*outstream).underflow_callback = outstream_underflow_callback as *mut _;
 			(*outstream).error_callback = outstream_error_callback as *mut _;
@@ -108,7 +108,11 @@ impl<'a> Device<'a> {
 			x => return Err(x.into()),
 		};
 
-		// TODO: Check layout_error
+		// TODO: Check this is the correct thing to do.
+		match unsafe { (*stream.userdata.outstream).layout_error } {
+			0 => {},
+			x => return Err(x.into()),
+		}
 		
 		Ok(stream)
 	}
