@@ -4,6 +4,7 @@ use bindings;
 
 use super::types::*;
 use super::device::*;
+use super::error::*;
 
 use std::ptr;
 use std::result;
@@ -146,7 +147,8 @@ impl Context {
 	}
 
 	/// Wake up any other threads calling wait_events().
-	/// TODO: For this to work, Context must be Send.
+	/// TODO: For this to work, Context must be Send. I need to check exactly which functions can be called from
+	/// different threads and then maybe separate Context into two objects, one that is Send/Sync and one that isn't.
 	pub fn wakeup(&self) {
 		unsafe {
 			bindings::soundio_wakeup(self.soundio);
@@ -162,9 +164,6 @@ impl Context {
 
 	// Get a device, or None if the index is out of bounds or you never called flush_events()
 	// (you have to call flush_events() before getting devices).
-
-	// TODO: Device must have a lifetime less than Context. Only references had lifetimes, so maybe I need to either return a &Device, or have a reference in it.
-	// Probably the latter? If I keep a reference to this object in it then it will have to stay around as long.
 	pub fn get_input_device(&self, index: usize) -> result::Result<Device, ()> {
 		let device = unsafe { bindings::soundio_get_input_device(self.soundio, index as c_int) };
 		if device == ptr::null_mut() {

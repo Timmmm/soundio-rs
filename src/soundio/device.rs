@@ -6,6 +6,8 @@ use super::types::*;
 use super::util::*;
 use super::outstream::*;
 use super::context::*;
+use super::error::*;
+use super::layout::*;
 
 use std::ptr;
 use std::os::raw::c_int;

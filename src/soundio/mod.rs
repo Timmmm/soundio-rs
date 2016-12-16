@@ -7,8 +7,9 @@ mod instream;
 mod outstream;
 mod util;
 mod layout;
+mod error;
 
-// TODO: Don't re-export everything.
+// TODO: Don't re-export absolutely everything.
 pub use self::types::*;
 pub use self::context::*;
 pub use self::device::*;
@@ -16,6 +17,7 @@ pub use self::instream::*;
 pub use self::outstream::*;
 pub use self::util::*;
 pub use self::layout::*;
+pub use self::error::*;
 
 use bindings;
 

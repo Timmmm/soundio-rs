@@ -6,6 +6,7 @@ use bindings;
 
 use super::types::*;
 use super::device::*;
+use super::error::*;
 
 use std;
 use std::mem;
