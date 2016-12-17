@@ -4,12 +4,13 @@ use bindings;
 
 use super::device::*;
 use super::error::*;
-use super::channel_areas::*;
+use super::types::*;
 
 use std::ptr;
 use std::os::raw::{c_int, c_double};
 use std::marker::PhantomData;
 use std::slice;
+use std::mem;
 
 pub extern fn outstream_write_callback(stream: *mut bindings::SoundIoOutStream, frame_count_min: c_int, frame_count_max: c_int) {
 	// Use stream.userdata to get a reference to the OutStream object.
@@ -21,6 +22,8 @@ pub extern fn outstream_write_callback(stream: *mut bindings::SoundIoOutStream, 
 		frame_count_min: frame_count_min as _,
 		frame_count_max: frame_count_max as _,
 		write_started: false,
+		channel_areas: Vec::new(),
+		frame_count: 0,
 		phantom: PhantomData,
 	};
 
@@ -118,10 +121,6 @@ impl<'a> OutStream<'a> {
 }
 
 
-
-
-
-
 /// OutStreamWriter is passed to the write callback and can be used to write to the stream.
 ///
 /// You start by calling `begin_write()` which yields a ChannelAreas object that you can
@@ -133,15 +132,21 @@ pub struct OutStreamWriter<'a> {
 
 	write_started: bool,
 
+	// The memory area to write to - one for each channel. Populated after begin_write()
+	channel_areas: Vec<bindings::SoundIoChannelArea>,
+	// The actual frame count. Populated after begin_write()
+	frame_count: usize,
+
 	// This cannot outlive the scope that it is spawned from (in the write callback).
 	phantom: PhantomData<&'a ()>,
 }
 
 impl<'a> OutStreamWriter<'a> {
-	/// Start a write. You can only call this once per callback.
-	// frame_count is the number of frames you want to write. It must be between
-	// frame_count_min and frame_count_max.
-	pub fn begin_write(&mut self, frame_count: usize) -> Result<ChannelAreas> {
+	/// Start a write. You can only call this once per callback otherwise it panics.
+	///
+	/// frame_count is the number of frames you want to write. It must be between
+	/// frame_count_min and frame_count_max.
+	pub fn begin_write(&mut self, frame_count: usize) -> Result<()> {
 		assert!(!self.write_started, "begin_write() called twice!");
 		assert!(frame_count >= self.frame_count_min && frame_count <= self.frame_count_max, "frame_count out of range");
 
@@ -151,27 +156,30 @@ impl<'a> OutStreamWriter<'a> {
 		match unsafe { bindings::soundio_outstream_begin_write(self.outstream, &mut areas as *mut _, &mut actual_frame_count as *mut _) } {
 			0 => {
 				self.write_started = true;
-				Ok( ChannelAreas {
-					outstream: self.outstream,
-					frame_count: actual_frame_count,
-					areas: unsafe { 
-						let mut a = vec![bindings::SoundIoChannelArea { ptr: ptr::null_mut(), step: 0 }; self.channel_count()];
-						a.copy_from_slice(slice::from_raw_parts::<bindings::SoundIoChannelArea>(areas, self.channel_count()));
-						a
-					},
-	//				phantom: PhantomData,
-				} )
+				self.frame_count = actual_frame_count as _;
+				let cc = self.channel_count();
+				self.channel_areas = vec![bindings::SoundIoChannelArea { ptr: ptr::null_mut(), step: 0 }; cc];
+				unsafe { self.channel_areas.copy_from_slice(slice::from_raw_parts::<bindings::SoundIoChannelArea>(areas, cc)); }
+				Ok(())
 			},
 			e => Err(e.into()),
 		}
 	}
-
+	
+	/// Get the minimum frame count that you can call begin_write() with.
 	pub fn frame_count_min(&self) -> usize {
 		self.frame_count_min
 	}
 
+	/// Get the maximum frame count that you can call begin_write() with.
 	pub fn frame_count_max(&self) -> usize {
 		self.frame_count_max
+	}
+
+	/// Get the actual frame count that you did call begin_write() with. Panics if you haven't yet.
+	pub fn frame_count(&self) -> usize {
+		assert!(self.write_started);
+		self.frame_count
 	}
 
 	// Get latency due to software only, not including hardware.
@@ -201,10 +209,52 @@ impl<'a> OutStreamWriter<'a> {
 			e => Err(e.into()),
 		}
 	}
+
+	/// Set the value of a sample/channel. Panics if out of range.
+	pub fn set_sample<T: Copy>(&mut self, channel: usize, frame: usize, sample: T) {
+		assert!(self.write_started);
+
+		// Check format is at least the right size. This is only done in debug builds for speed reasons.
+		debug_assert_eq!(mem::size_of::<T>(), Format::from(unsafe { (*self.outstream).format }).bytes_per_sample());
+
+		assert!(channel < self.channel_count(), "Channel out of range");
+		assert!(frame < self.frame_count(), "Frame out of range");
+
+		unsafe {
+			let ptr = self.channel_areas[channel].ptr.offset((frame * self.channel_areas[channel].step as usize) as isize) as *mut T;
+			*ptr = sample;
+		}
+	}
+
+	/// Get the value of a sample/channel. Panics if out of range.
+	pub fn sample<T: Copy>(&self, channel: usize, frame: usize) -> T {
+		assert!(self.write_started);
+
+		// Check format is at least the right size. This is only done in debug builds for speed reasons.
+		debug_assert_eq!(mem::size_of::<T>(), Format::from(unsafe { (*self.outstream).format }).bytes_per_sample());
+
+		assert!(channel < self.channel_count(), "Channel out of range");
+		assert!(frame < self.frame_count(), "Frame out of range");
+
+		unsafe {
+			let ptr = self.channel_areas[channel].ptr.offset((frame * self.channel_areas[channel].step as usize) as isize) as *mut T;
+			*ptr
+		}
+	}
 }
 
-
-
+impl<'a> Drop for OutStreamWriter<'a> {
+	fn drop(&mut self) {
+		if self.write_started {
+			unsafe {
+				match bindings::soundio_outstream_end_write(self.outstream) {
+					0 => {},
+					x => panic!("Error writing outstream: {}", Error::from(x)),
+				}
+			}
+		}
+	}
+}
 
 
 

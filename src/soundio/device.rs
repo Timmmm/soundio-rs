@@ -31,7 +31,15 @@ impl<'a> Device<'a> {
 	}
 
 	pub fn is_raw(&self) -> bool {
-		unsafe { (*self.device).is_raw != 0 }
+		unsafe {
+			(*self.device).is_raw != 0
+		}
+	}
+
+	pub fn aim(&self) -> DeviceAim {
+		unsafe {
+			(*self.device).aim.into()
+		}
 	}
 
 	pub fn sort_channel_layouts(&self) {
@@ -68,11 +76,21 @@ impl<'a> Device<'a> {
 	// TODO: Double check this
 	// TODO: Outstream needs to have a lifetime less than this.
 	// TODO: Include underflow and error callbacks.
-	pub fn open_outstream<CB: 'static + FnMut(&mut OutStreamWriter)>(&self,
-			sample_rate: i32,
-			format: Format,
-			layout: ChannelLayout,
-			write_callback: CB) -> Result<OutStream> {
+	pub fn open_outstream<WriteCB, UnderflowCB, ErrorCB>(
+				&self,
+				sample_rate: i32,
+				format: Format,
+				layout: ChannelLayout,
+				latency: f64,
+				write_callback: WriteCB,
+				underflow_callback: Option<UnderflowCB>,
+				error_callback: Option<ErrorCB>,
+				) -> Result<OutStream>
+		where
+			WriteCB: 'static + FnMut(&mut OutStreamWriter),
+			UnderflowCB: 'static + FnMut(),
+			ErrorCB: 'static + FnMut(Error) {
+
 		let mut outstream = unsafe { bindings::soundio_outstream_create(self.device) };
 		if outstream == ptr::null_mut() {
 			// Note that we should really abort() here (that's what the rest of Rust
@@ -84,7 +102,7 @@ impl<'a> Device<'a> {
 			(*outstream).sample_rate = sample_rate;
 			(*outstream).format = format.into();
 			(*outstream).layout = layout.into();
-			(*outstream).software_latency = 0.0; // TODO: What do I put here?
+			(*outstream).software_latency = latency;
 			(*outstream).write_callback = outstream_write_callback as *mut _;
 			(*outstream).underflow_callback = outstream_underflow_callback as *mut _;
 			(*outstream).error_callback = outstream_error_callback as *mut _;
@@ -94,8 +112,14 @@ impl<'a> Device<'a> {
 			userdata: Box::new( OutStreamUserData {
 				outstream: outstream,
 				write_callback: Box::new(write_callback),
-				underflow_callback: None,
-				error_callback: None,
+				underflow_callback: match underflow_callback {
+					Some(cb) => Some(Box::new(cb)),
+					None => None,
+				},
+				error_callback: match error_callback {
+					Some(cb) => Some(Box::new(cb)),
+					None => None,
+				}
 			} ),
 			phantom: PhantomData,
 		};

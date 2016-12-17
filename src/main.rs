@@ -16,19 +16,16 @@ impl SineWavePlayer {
 		println!("my_write_callback called! Min/max frames: {}, {}; latency: {}", stream.frame_count_min(), stream.frame_count_max(), stream.get_latency().unwrap_or(-1.0));
 
 		let frame_count_max = stream.frame_count_max();
-		let mut channel_areas = match stream.begin_write(frame_count_max) {
-			Ok(x) => x,
-			Err(e) => {
-				println!("Error writing to stream: {}", e);
-				return;
-			}
-		};
-
+		if let Err(e) = stream.begin_write(frame_count_max) {
+			println!("Error writing to stream: {}", e);
+			return;
+		}
+		
 		let phase_step = self.frequency / stream.sample_rate() as f64 * 2.0 * PI;
 
-		for c in 0..channel_areas.channel_count() {
-			for f in 0..channel_areas.frame_count() {
-				channel_areas.set_sample::<f32>(c, f, (self.phase.sin() * self.amplitude) as f32);
+		for c in 0..stream.channel_count() {
+			for f in 0..stream.frame_count() {
+				stream.set_sample::<f32>(c, f, (self.phase.sin() * self.amplitude) as f32);
 				self.phase += phase_step;
 			}
 		}
@@ -138,32 +135,39 @@ fn run() -> Result<(), String> {
 		48000,
 		soundio::Format::Float32LE,
 		soundio::ChannelLayout::get_default(2),
+		0.5,
 		move |x| sine.write_callback(x),
+		None::<fn()>,
+		None::<fn(soundio::Error)>,
 	)?;
 
 	println!("Starting stream");
 	output_stream.start()?;
 
-	// Run the loop in a new thread.
-	let child = thread::spawn(move || {
-		while exit_cv == 0 {
-			println!("wait_events");
-			ctx.wait_events();
-			println!("waited");
-		}
-	});
+	// // Run the loop in a new thread.
+	// let child = thread::spawn(move || {
+	// 	while exit_cv == 0 {
+	// 		println!("wait_events");
+	// 		ctx.wait_events();
+	// 		println!("waited");
+	// 	}
+	// });
 
-	// Wait for key presses.
+	// // Wait for key presses.
 
-	let mut stdin = io::stdin();
-	let input = &mut String::new();
+	// let mut stdin = io::stdin();
+	// let input = &mut String::new();
 
-	input.clear();
-	stdin.read_line(input);
-	exit_cv = 1;
-	ctx.wake_up();
+	// input.clear();
+	// stdin.read_line(input);
+	// exit_cv = 1;
+	// ctx.wake_up();
 
-	child.join();
+	// child.join();
+
+	loop {
+		ctx.wait_events();
+	}
 }
 
 fn main() {

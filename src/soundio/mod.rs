@@ -8,7 +8,6 @@ mod outstream;
 mod util;
 mod layout;
 mod error;
-mod channel_areas;
 
 // TODO: Don't re-export absolutely everything.
 pub use self::types::*;
@@ -19,7 +18,6 @@ pub use self::outstream::*;
 pub use self::util::*;
 pub use self::layout::*;
 pub use self::error::*;
-pub use self::channel_areas::*;
 
 use bindings;
 

@@ -523,13 +523,13 @@ impl From<Format> for bindings::SoundIoFormat {
 }
 
 impl Format {
-	pub fn bytes_per_sample(&self) -> i32 {
-		unsafe { bindings::soundio_get_bytes_per_sample((*self).into()) as i32 }
+	pub fn bytes_per_sample(&self) -> usize {
+		unsafe { bindings::soundio_get_bytes_per_sample((*self).into()) as usize }
 	}
-	pub fn bytes_per_frame(&self, channel_count: i32) -> i32 {
+	pub fn bytes_per_frame(&self, channel_count: usize) -> usize {
 		self.bytes_per_sample() * channel_count
 	}
-	pub fn bytes_per_second(&self, channel_count: i32, sample_rate: i32) -> i32 {
+	pub fn bytes_per_second(&self, channel_count: usize, sample_rate: usize) -> usize {
 		self.bytes_per_sample() * channel_count * sample_rate
 	}
 }
