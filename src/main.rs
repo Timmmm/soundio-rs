@@ -1,6 +1,40 @@
 extern crate soundio;
 extern crate rand;
 
+use std::f64::consts::PI;
+use std::thread;
+use std::io;
+
+struct SineWavePlayer {
+	phase: f64, // Phase is updated each time the write callback is called.
+	frequency: f64,
+	amplitude: f64,
+}
+
+impl SineWavePlayer {
+	fn write_callback(&mut self, stream: &mut soundio::OutStreamWriter) {
+		println!("my_write_callback called! Min/max frames: {}, {}; latency: {}", stream.frame_count_min(), stream.frame_count_max(), stream.get_latency().unwrap_or(-1.0));
+
+		let frame_count_max = stream.frame_count_max();
+		let mut channel_areas = match stream.begin_write(frame_count_max) {
+			Ok(x) => x,
+			Err(e) => {
+				println!("Error writing to stream: {}", e);
+				return;
+			}
+		};
+
+		let phase_step = self.frequency / stream.sample_rate() as f64 * 2.0 * PI;
+
+		for c in 0..channel_areas.channel_count() {
+			for f in 0..channel_areas.frame_count() {
+				channel_areas.set_sample::<f32>(c, f, (self.phase.sin() * self.amplitude) as f32);
+				self.phase += phase_step;
+			}
+		}
+	}
+}
+/*
 fn my_write_callback(stream: &mut soundio::StreamWriter) {
 	println!("my_write_callback called! Min/max frames: {}, {}; latency: {}", stream.frame_count_min(), stream.frame_count_max(), stream.get_latency().unwrap_or(-1.0));
 	let mut channel_areas = match stream.begin_write(stream.frame_count_max()) {
@@ -21,7 +55,7 @@ fn my_write_callback(stream: &mut soundio::StreamWriter) {
 	// for i in 0..channel_left.len() {
 	// 	channel_left[i] = 0;
 	// }
-}
+}*/
 
 // Print sound soundio debug info and play back a sound.
 fn run() -> Result<(), String> {
@@ -93,24 +127,43 @@ fn run() -> Result<(), String> {
 
 	// What I want to do is something like this:
 
+	let mut sine = SineWavePlayer {
+		phase: 0.0,
+		amplitude: 0.5,
+		frequency: 400.0,
+	};
+
 	println!("Opening default output stream");
 	let mut output_stream = output_dev.open_outstream(
 		48000,
 		soundio::Format::Float32LE,
 		soundio::ChannelLayout::get_default(2),
-		my_write_callback
+		move |x| sine.write_callback(x),
 	)?;
 
 	println!("Starting stream");
 	output_stream.start()?;
 
-	loop {
-		println!("wait_events");
-		ctx.wait_events();
-		println!("waited");
-	}
+	// Run the loop in a new thread.
+	let child = thread::spawn(move || {
+		while exit_cv == 0 {
+			println!("wait_events");
+			ctx.wait_events();
+			println!("waited");
+		}
+	});
 
-	Ok(())
+	// Wait for key presses.
+
+	let mut stdin = io::stdin();
+	let input = &mut String::new();
+
+	input.clear();
+	stdin.read_line(input);
+	exit_cv = 1;
+	ctx.wake_up();
+
+	child.join();
 }
 
 fn main() {

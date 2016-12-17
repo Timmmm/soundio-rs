@@ -1,63 +1,70 @@
 #![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 
 use bindings;
 
-use super::types::*;
 use super::device::*;
 use super::error::*;
+use super::channel_areas::*;
 
-use std;
-use std::mem;
-use std::ffi::CStr;
 use std::ptr;
-use std::fmt;
-use std::error;
-use std::result;
-use std::os::raw::{c_int, c_char, c_void, c_double};
+use std::os::raw::{c_int, c_double};
 use std::marker::PhantomData;
 use std::slice;
-
-/// OutStream Callbacks
-///
-///
-///
-///
 
 pub extern fn outstream_write_callback(stream: *mut bindings::SoundIoOutStream, frame_count_min: c_int, frame_count_max: c_int) {
 	// Use stream.userdata to get a reference to the OutStream object.
 	let raw_userdata_pointer = unsafe { (*stream).userdata as *mut OutStreamUserData };
 	let userdata = unsafe { &mut (*raw_userdata_pointer) };
 
-	let mut stream_writer = StreamWriter {
+	let mut stream_writer = OutStreamWriter {
 		outstream: userdata.outstream,
 		frame_count_min: frame_count_min as _,
 		frame_count_max: frame_count_max as _,
+		write_started: false,
+		phantom: PhantomData,
 	};
 
 	(userdata.write_callback)(&mut stream_writer);
+
+	// TODO: Something like this?
+	// if stream_writer.write_started {
+	// 	unsafe {
+	// 		match bindings::soundio_outstream_end_write(stream_writer.outstream) {
+	// 			0 => {},
+	// 			x => panic!("Error writing outstream: {}", Error::from(x)),
+	// 		}
+	// 	}
+	// }
 }
 
 pub extern fn outstream_underflow_callback(stream: *mut bindings::SoundIoOutStream) {
-//	unimplemented!();
-	println!("Outstream Underflow");
+	// Use stream.userdata to get a reference to the OutStream object.
+	let raw_userdata_pointer = unsafe { (*stream).userdata as *mut OutStreamUserData };
+	let userdata = unsafe { &mut (*raw_userdata_pointer) };
+
+	if let Some(ref mut cb) = userdata.underflow_callback {
+		cb();
+	}
 }
 
 pub extern fn outstream_error_callback(stream: *mut bindings::SoundIoOutStream, err: c_int) {
-//	unimplemented!();
-	println!("Outstream Error: {}", Error::from(err))
+	// Use stream.userdata to get a reference to the OutStream object.
+	let raw_userdata_pointer = unsafe { (*stream).userdata as *mut OutStreamUserData };
+	let userdata = unsafe { &mut (*raw_userdata_pointer) };
+
+	if let Some(ref mut cb) = userdata.error_callback {
+		cb(err.into());
+	}
 }
 
 
 
 
 
-/// OutStream
+/// OutStream represents an output stream for playback.
 ///
-///
-///
-///
+/// It is obtained from `Device` using `Device::open_outstream()` and
+/// can be started, paused, and stopped.
 
 pub struct OutStream<'a> {
 	pub userdata: Box<OutStreamUserData>,
@@ -66,11 +73,13 @@ pub struct OutStream<'a> {
 	pub phantom: PhantomData<&'a Device<'a>>,
 }
 
+// The callbacks required for an outstream are stored in this object. We also store a pointer
+// to the raw outstream so that it can be passed to OutStreamWriter in the write callback.
 pub struct OutStreamUserData {
 	pub outstream: *mut bindings::SoundIoOutStream,
 
 	// TODO: Do these need to be thread-safe as write_callback() is called in a different thread?
-	pub write_callback: Box<FnMut(&mut StreamWriter)>, // TODO: This shouldn't be an option.
+	pub write_callback: Box<FnMut(&mut OutStreamWriter)>,
 	pub underflow_callback: Option<Box<FnMut()>>,
 	pub error_callback: Option<Box<FnMut(Error)>>,
 }
@@ -113,39 +122,46 @@ impl<'a> OutStream<'a> {
 
 
 
-/// StreamWriter
+/// OutStreamWriter is passed to the write callback and can be used to write to the stream.
 ///
-///
-///
-///
-
-pub struct StreamWriter {
-	// TODO: Add PhantomData...
-
+/// You start by calling `begin_write()` which yields a ChannelAreas object that you can
+/// actually alter. When the ChannelAreas is dropped, the write is committed.
+pub struct OutStreamWriter<'a> {
 	outstream: *mut bindings::SoundIoOutStream,
 	frame_count_min: usize,
 	frame_count_max: usize,
 
+	write_started: bool,
+
+	// This cannot outlive the scope that it is spawned from (in the write callback).
+	phantom: PhantomData<&'a ()>,
 }
 
-impl StreamWriter {
-	// TODO: Somehow restrict this so you can't call it twice? Or just check that dynamically.
+impl<'a> OutStreamWriter<'a> {
+	/// Start a write. You can only call this once per callback.
 	// frame_count is the number of frames you want to write. It must be between
 	// frame_count_min and frame_count_max.
-	pub fn begin_write(&self, frame_count: usize) -> Result<ChannelAreas> {
+	pub fn begin_write(&mut self, frame_count: usize) -> Result<ChannelAreas> {
+		assert!(!self.write_started, "begin_write() called twice!");
+		assert!(frame_count >= self.frame_count_min && frame_count <= self.frame_count_max, "frame_count out of range");
+
 		let mut areas: *mut bindings::SoundIoChannelArea = ptr::null_mut();
 		let mut actual_frame_count: c_int = frame_count as _;
 
 		match unsafe { bindings::soundio_outstream_begin_write(self.outstream, &mut areas as *mut _, &mut actual_frame_count as *mut _) } {
-			0 => Ok( ChannelAreas {
-				outstream: self.outstream,
-				frame_count: actual_frame_count,
-				areas: unsafe { 
-					let mut a = vec![bindings::SoundIoChannelArea { ptr: ptr::null_mut(), step: 0 }; self.channel_count()];
-					a.copy_from_slice(slice::from_raw_parts::<bindings::SoundIoChannelArea>(areas, self.channel_count()));
-					a
-				},
-			} ),
+			0 => {
+				self.write_started = true;
+				Ok( ChannelAreas {
+					outstream: self.outstream,
+					frame_count: actual_frame_count,
+					areas: unsafe { 
+						let mut a = vec![bindings::SoundIoChannelArea { ptr: ptr::null_mut(), step: 0 }; self.channel_count()];
+						a.copy_from_slice(slice::from_raw_parts::<bindings::SoundIoChannelArea>(areas, self.channel_count()));
+						a
+					},
+	//				phantom: PhantomData,
+				} )
+			},
 			e => Err(e.into()),
 		}
 	}
@@ -167,7 +183,13 @@ impl StreamWriter {
 
 	pub fn channel_count(&self) -> usize {
 		unsafe {
-			(*self.outstream).layout.channel_count as usize
+			(*self.outstream).layout.channel_count as _
+		}
+	}
+
+	pub fn sample_rate(&self) -> i32 {
+		unsafe {
+			(*self.outstream).sample_rate as _
 		}
 	}
 
@@ -183,74 +205,6 @@ impl StreamWriter {
 
 
 
-
-
-/// ChannelAreas
-///
-///
-///
-///
-
-pub struct ChannelAreas {
-	outstream: *mut bindings::SoundIoOutStream,
-	frame_count: i32,
-
-	// The memory area to write to - one for each channel.
-	areas: Vec<bindings::SoundIoChannelArea>,
-}
-
-impl ChannelAreas {
-	pub fn frame_count(&self) -> usize { // TODO: Decide whether channels, frames, etc. should be usize or i32.
-		self.frame_count as _
-	}
-
-	pub fn channel_count(&self) -> usize {
-		unsafe {
-			(*self.outstream).layout.channel_count as _
-		}
-	}
-
-	// Get the slice which we can write to.
-	// T is the slice type they want.
-	// TODO: Panic if the format is wrong?
-	// TODO: Also panic if the step is not equal to sizeof(T).
-	// TODO: Otherwise maybe we have to use a slice of structs, where the structs are
-	// packet and have padding to take them up to step?
-	pub fn get_slice<T>(&mut self, channel: i32) -> &mut [T] {
-		// TODO: This fails because the channels are interleaved. I'm not quite sure how to handle that.
-		assert_eq!(self.areas[channel as usize].step as usize, std::mem::size_of::<T>());
-
-		unsafe {
-			std::slice::from_raw_parts_mut(self.areas[channel as usize].ptr as *mut T, self.frame_count as usize)
-		}
-	}
-
-	pub fn get_step(&mut self, channel: i32) -> i32 {
-		self.areas[channel as usize].step as i32
-	}
-
-	// Set the value of a sample/channel. Panics if out of range.
-	pub fn set_sample<T>(&mut self, channel: usize, frame: usize, sample: T) {
-		assert!(channel < self.channel_count(), "Channel out of range");
-		assert!(frame < self.frame_count(), "Frame out of range");
-
-		unsafe {
-			let ptr = self.areas[channel].ptr.offset((frame * self.areas[channel].step as usize) as isize) as *mut T;
-			*ptr = sample;
-		}
-	}
-}
-
-impl Drop for ChannelAreas {
-	fn drop(&mut self) {
-		unsafe {
-			match bindings::soundio_outstream_end_write(self.outstream) {
-				0 => {},
-				x => panic!("Error writing outstream: {}", Error::from(x)),
-			}
-		}
-	}
-}
 
 
 

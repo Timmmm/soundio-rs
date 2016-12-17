@@ -68,7 +68,7 @@ impl<'a> Device<'a> {
 	// TODO: Double check this
 	// TODO: Outstream needs to have a lifetime less than this.
 	// TODO: Include underflow and error callbacks.
-	pub fn open_outstream<CB: 'static + FnMut(&mut StreamWriter)>(&self,
+	pub fn open_outstream<CB: 'static + FnMut(&mut OutStreamWriter)>(&self,
 			sample_rate: i32,
 			format: Format,
 			layout: ChannelLayout,
