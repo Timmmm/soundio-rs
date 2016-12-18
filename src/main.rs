@@ -1,20 +1,19 @@
 extern crate soundio;
 extern crate rand;
+extern crate crossbeam;
 
 use std::f64::consts::PI;
-use std::thread;
 use std::io;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 struct SineWavePlayer {
 	phase: f64, // Phase is updated each time the write callback is called.
 	frequency: f64,
-	amplitude: f64,
+	amplitude: f64, // TODO: For some reason amplitude close to 1 (maybe > 0.99?) and high frequency (e.g. 18 kHz) gives weird low frequency aliasing or something.
 }
 
 impl SineWavePlayer {
 	fn write_callback(&mut self, stream: &mut soundio::OutStreamWriter) {
-		println!("my_write_callback called! Min/max frames: {}, {}; latency: {}", stream.frame_count_min(), stream.frame_count_max(), stream.get_latency().unwrap_or(-1.0));
-
 		let frame_count_max = stream.frame_count_max();
 		if let Err(e) = stream.begin_write(frame_count_max) {
 			println!("Error writing to stream: {}", e);
@@ -32,26 +31,59 @@ impl SineWavePlayer {
 	}
 }
 /*
-fn my_write_callback(stream: &mut soundio::StreamWriter) {
-	println!("my_write_callback called! Min/max frames: {}, {}; latency: {}", stream.frame_count_min(), stream.frame_count_max(), stream.get_latency().unwrap_or(-1.0));
-	let mut channel_areas = match stream.begin_write(stream.frame_count_max()) {
-		Ok(x) => x,
-		Err(e) => {
-			println!("Error writing to stream: {}", e);
-			return;
-		}
-	};
+struct WavPlayer {
+}
 
-	for c in 0..channel_areas.channel_count() {
-		for f in 0..channel_areas.frame_count() {
-			channel_areas.set_sample(c, f, rand::random::<f32>());
-		}
+impl WavPlayer {
+	fn write_callback(&mut self, stream: &mut soundio::OutStreamWriter) {
 	}
 
-	// let mut channel_left = channel_areas.get_slice(0);
-	// for i in 0..channel_left.len() {
-	// 	channel_left[i] = 0;
-	// }
+	pub fn cache_file(&mut self, filename: &str) {
+
+	}
+
+	pub fn play(filename: &str) {
+
+	}
+}
+*/
+
+// A simple mono audio recorder. All functions are thread-safe
+// so you can simply create an object of this type, it will connect to
+// libsoundio, and then you can read() some samples whenever you like.
+/*struct SoundRecorder {
+	context: soundio::Context,
+	mic: soundio::Device,
+	ring_buffer: ?,
+}
+
+impl SoundRecorder {
+	// Open the default input device as mono at 48 kHz.
+	fn open() -> Result<SoundRecorder, String> {
+
+	}
+
+	fn start(&mut self) {
+
+	}
+
+	fn stop(&mut self) {
+
+	}
+
+	// Get the number of pending samples.
+	fn size(&self) -> usize {
+	}
+
+	// Pop any pending samples from the ring buffer.
+	fn read(&mut self) -> Vec<u16> {
+
+	}
+
+
+	fn read_blocking(&mut self, samples: usize) -> Vec<u16> {
+
+	}
 }*/
 
 // Print sound soundio debug info and play back a sound.
@@ -144,30 +176,38 @@ fn run() -> Result<(), String> {
 	println!("Starting stream");
 	output_stream.start()?;
 
-	// // Run the loop in a new thread.
-	// let child = thread::spawn(move || {
-	// 	while exit_cv == 0 {
-	// 		println!("wait_events");
-	// 		ctx.wait_events();
-	// 		println!("waited");
-	// 	}
-	// });
 
-	// // Wait for key presses.
+	let exit_loop = AtomicBool::new(false);
+	let exit_loop_ref = &exit_loop;
 
-	// let mut stdin = io::stdin();
-	// let input = &mut String::new();
+	// Run the loop in a new thread.
 
-	// input.clear();
-	// stdin.read_line(input);
-	// exit_cv = 1;
-	// ctx.wake_up();
+	crossbeam::scope(|scope| {
 
-	// child.join();
+		let ctx_ref = &ctx;
 
-	loop {
-		ctx.wait_events();
-	}
+        scope.spawn(move || {
+			while exit_loop_ref.load(Ordering::Relaxed) != true {
+				println!("wait_events");
+				ctx_ref.wait_events();
+				println!("waited");
+			}
+		});
+
+		let stdin = io::stdin();
+		let input = &mut String::new();
+
+		input.clear();
+		println!("Waiting for line");
+		let _ = stdin.read_line(input);
+		println!("Got line");
+		exit_loop.store(true, Ordering::Relaxed);
+		println!("Exit loop stored");
+		ctx.wakeup();
+
+	});
+	// Wait for key presses.
+	Ok(())
 }
 
 fn main() {

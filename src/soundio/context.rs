@@ -266,4 +266,7 @@ impl Drop for Context {
 	}
 }
 
-
+// This allows wakeup and wait_events to be called from other threads.
+// TODO: Find out exactly the thread-safety properties of libsoundio.
+unsafe impl Send for Context {}
+unsafe impl Sync for Context {}

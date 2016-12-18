@@ -8,3 +8,8 @@ build = "build.rs"
 [dependencies]
 libc = "0.2.17"
 rand = "0.3"
+
+# This is just for the examples; for scoped threads.
+crossbeam = "0.2.10"
+# Just for examples; for wav playback and recording.
+hound = "3.0.0"
