@@ -7,6 +7,7 @@ use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::io::BufReader;
 use std::fs::File;
+use std::env;
 
 struct WavPlayer {
 	reader: hound::WavReader<BufReader<File>>,
@@ -128,7 +129,14 @@ fn play(filename: &str) -> Result<(), String> {
 }
 
 fn main() {
-	match play("test.wav") {
+    let args: Vec<String> = env::args().collect();
+	if args.len() != 2 {
+		println!("Usage: {} <filename.wav>", args[0]);
+		return;
+	}
+
+
+	match play(&args[1]) {
 		Err(x) => println!("Error: {}", x),
 		_ => {},
 	}
