@@ -5,7 +5,6 @@ use bindings;
 use super::types::*;
 use super::util::*;
 use super::outstream::*;
-use super::context::*;
 use super::error::*;
 use super::layout::*;
 
@@ -16,8 +15,8 @@ use std::marker::PhantomData;
 pub struct Device<'a> {
 	pub device: *mut bindings::SoundIoDevice,
 
-	// This is just here to say that Device cannot outlive the Context it was created from.
-	pub phantom: PhantomData<&'a Context>,
+	// This is just here to say that Device cannot outlive the Context it was created from. 'a is the lifetime of that Context.
+	pub phantom: PhantomData<&'a ()>,
 }
 
 /// Device represents an input or output device.
@@ -73,11 +72,11 @@ impl<'a> Device<'a> {
 		}
 	}
 
-	// TODO: Double check this
-	// TODO: Outstream needs to have a lifetime less than this.
-	// TODO: Include underflow and error callbacks.
-	pub fn open_outstream<WriteCB, UnderflowCB, ErrorCB>(
-				&self,
+	// 'a is the lifetime of the Device. The OutStream lifetime 'b must be less than or equal to 'a (indicated by `'b: 'a`).
+	// Also the callbacks must have a lifetime greate than or equal to 'b.
+	// The callbacks only need to have the lifetime
+	pub fn open_outstream<'b: 'a, WriteCB, UnderflowCB, ErrorCB>(
+				&'a self,
 				sample_rate: i32,
 				format: Format,
 				layout: ChannelLayout,
@@ -85,11 +84,11 @@ impl<'a> Device<'a> {
 				write_callback: WriteCB,
 				underflow_callback: Option<UnderflowCB>,
 				error_callback: Option<ErrorCB>,
-				) -> Result<OutStream>
+				) -> Result<OutStream<'b>>
 		where
-			WriteCB: 'static + FnMut(&mut OutStreamWriter),
-			UnderflowCB: 'static + FnMut(),
-			ErrorCB: 'static + FnMut(Error) {
+			WriteCB: 'b + FnMut(&mut OutStreamWriter),
+			UnderflowCB: 'b + FnMut(),
+			ErrorCB: 'b + FnMut(Error) {
 
 		let mut outstream = unsafe { bindings::soundio_outstream_create(self.device) };
 		if outstream == ptr::null_mut() {
