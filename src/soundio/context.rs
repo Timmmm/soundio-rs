@@ -8,7 +8,7 @@ use super::error::*;
 
 use std::ptr;
 use std::result;
-use std::os::raw::c_int;
+use std::os::raw::{c_int, c_char};
 use std::marker::PhantomData;
 
 /// `Context` represents the libsoundio library.
@@ -62,7 +62,8 @@ impl Context {
 			soundio: soundio,
 			app_name: app_name.to_string(),
 		};
-		// TODO: Set app name in soundio.app_name.
+		// TODO: Check this is ok... I think we're ok as long as we always set this when context.app_name is changed.
+		unsafe { (*context.soundio).app_name = context.app_name.as_ptr() as *mut c_char; }
 
 		// TODO: Save a reference here so that we can have user-defined callbacks (see OutStreamUserData).
 		//   (*context.soundio).userdata = &context;
@@ -78,11 +79,7 @@ impl Context {
 	/// Set the app name. This is shown in JACK and some other backends. Any colons are stripped. The max length is ? and the default is ?.
 	pub fn set_app_name(&mut self, name: String) {
 		self.app_name = name.chars().filter(|&x| x != ':').collect();
-		// TODO: Actually set the app name in libsoundio. I need to understand lifetimes more for that...
-		// Or maybe I just force the name to be 'static &str.
-		//
-		// Orrr maybe I box a str. Hmm yeah that probably makes the most sense I guess?
-		//	unsafe { (*self.soundio).app_name = self.app_name.as_bytes() as *mut c_char; } // ?
+		unsafe { (*self.soundio).app_name = self.app_name.as_ptr() as *mut c_char; }
 	}
 
 	/// Get the app name previously set by `set_app_name()`. 
