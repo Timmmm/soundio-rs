@@ -534,6 +534,53 @@ impl Format {
 	}
 }
 
+// Bit of a hack, but useful!
+macro_rules! format_from_type {
+    ($basic_type:ty, $format_type:path) => (
+        impl From<$basic_type> for Format {
+			fn from(val: $basic_type) -> Format {
+				$format_type
+    		}
+		}
+	)
+}
+
+// I'm assuming little endian. If you're using big endian I pity you.
+format_from_type!(i8, Format::S8);
+format_from_type!(u8, Format::U8);
+format_from_type!(i16, Format::S16LE);
+format_from_type!(u16, Format::U16LE);
+// TODO: What about i24?
+format_from_type!(i32, Format::S32LE);
+format_from_type!(u32, Format::U32LE);
+format_from_type!(f32, Format::Float32LE);
+format_from_type!(f64, Format::Float64LE);
+
+pub trait CastF64 {
+    fn from_f64(v: f64) -> Self;
+	fn to_f64(v: Self) -> f64;
+}
+
+macro_rules! impl_cast_f64 {
+    ($($ty:ty)*) => {
+        $(
+            impl CastF64 for $ty {
+                #[inline]
+                fn from_f64(v: f64) -> $ty {
+                    v as $ty
+                }
+
+                #[inline]
+                fn to_f64(v: $ty) -> f64 {
+                    v as f64
+                }
+            }
+        )*
+    }
+}
+
+impl_cast_f64!(u8 u16 u32 u64 usize i8 i16 i32 i64 isize f32 f64);
+
 impl fmt::Display for Format {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let c_str: &CStr = unsafe { CStr::from_ptr(bindings::soundio_format_string((*self).into())) };

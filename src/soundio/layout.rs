@@ -74,7 +74,7 @@ impl ChannelLayout {
 		}
 	}
 
-	pub fn best_matching_channel_layout(preferred_layouts: &Vec<ChannelLayout>, available_layouts: &Vec<ChannelLayout>) -> Option<ChannelLayout> {
+	pub fn best_matching_channel_layout(_preferred_layouts: &Vec<ChannelLayout>, _available_layouts: &Vec<ChannelLayout>) -> Option<ChannelLayout> {
 
 		unimplemented!();
 	}
@@ -92,7 +92,7 @@ impl ChannelLayout {
 		unimplemented!();
 	}
 
-	pub fn sort(layouts: &mut [ChannelLayout]) {
+	pub fn sort(_layouts: &mut [ChannelLayout]) {
 
 		unimplemented!();
 	}

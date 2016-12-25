@@ -2,7 +2,6 @@
 
 use bindings;
 
-use super::device::*;
 use super::error::*;
 use super::types::*;
 
@@ -11,6 +10,7 @@ use std::os::raw::{c_int, c_double};
 use std::marker::PhantomData;
 use std::slice;
 use std::mem;
+use std::num;
 
 pub extern fn outstream_write_callback(stream: *mut bindings::SoundIoOutStream, frame_count_min: c_int, frame_count_max: c_int) {
 	// Use stream.userdata to get a reference to the OutStream object.
@@ -28,16 +28,6 @@ pub extern fn outstream_write_callback(stream: *mut bindings::SoundIoOutStream, 
 	};
 
 	(userdata.write_callback)(&mut stream_writer);
-
-	// TODO: Something like this?
-	// if stream_writer.write_started {
-	// 	unsafe {
-	// 		match bindings::soundio_outstream_end_write(stream_writer.outstream) {
-	// 			0 => {},
-	// 			x => panic!("Error writing outstream: {}", Error::from(x)),
-	// 		}
-	// 	}
-	// }
 }
 
 pub extern fn outstream_underflow_callback(stream: *mut bindings::SoundIoOutStream) {
@@ -60,34 +50,29 @@ pub extern fn outstream_error_callback(stream: *mut bindings::SoundIoOutStream, 
 	}
 }
 
-
-
-
-
 /// OutStream represents an output stream for playback.
 ///
 /// It is obtained from `Device` using `Device::open_outstream()` and
 /// can be started, paused, and stopped.
 
 pub struct OutStream<'a> {
-	pub userdata: Box<OutStreamUserData>,
+	pub userdata: Box<OutStreamUserData<'a>>,
 	
 	// This is just here to say that OutStream cannot outlive the Device it was created from.
-	pub phantom: PhantomData<&'a Device<'a>>,
+	pub phantom: PhantomData<&'a ()>,
 }
 
 // The callbacks required for an outstream are stored in this object. We also store a pointer
 // to the raw outstream so that it can be passed to OutStreamWriter in the write callback.
-pub struct OutStreamUserData {
+pub struct OutStreamUserData<'a> {
 	pub outstream: *mut bindings::SoundIoOutStream,
 
-	// TODO: Do these need to be thread-safe as write_callback() is called in a different thread?
-	pub write_callback: Box<FnMut(&mut OutStreamWriter)>,
-	pub underflow_callback: Option<Box<FnMut()>>,
-	pub error_callback: Option<Box<FnMut(Error)>>,
+	pub write_callback: Box<FnMut(&mut OutStreamWriter) + 'a>,
+	pub underflow_callback: Option<Box<FnMut() + 'a>>,
+	pub error_callback: Option<Box<FnMut(Error) + 'a>>,
 }
 
-impl Drop for OutStreamUserData {
+impl<'a> Drop for OutStreamUserData<'a> {
 	fn drop(&mut self) {
 		unsafe {
 			bindings::soundio_outstream_destroy(self.outstream);
@@ -95,7 +80,6 @@ impl Drop for OutStreamUserData {
 	}
 }
 
-// Outstream; copy this for instream.
 impl<'a> OutStream<'a> {
 	pub fn start(&mut self) -> Result<()> {
 		match unsafe { bindings::soundio_outstream_start(self.userdata.outstream) } {
@@ -117,9 +101,7 @@ impl<'a> OutStream<'a> {
 			e => Err(e.into()),
 		}
 	}
-
 }
-
 
 /// OutStreamWriter is passed to the write callback and can be used to write to the stream.
 ///
@@ -210,12 +192,14 @@ impl<'a> OutStreamWriter<'a> {
 		}
 	}
 
-	/// Set the value of a sample/channel. Panics if out of range.
-	pub fn set_sample<T: Copy>(&mut self, channel: usize, frame: usize, sample: T) {
+	/// Set the value of a sample/channel. Panics if out of range or the wrong sized type (in debug builds).
+	pub fn set_sample_typed<T: Copy>(&mut self, channel: usize, frame: usize, sample: T) {
 		assert!(self.write_started);
 
 		// Check format is at least the right size. This is only done in debug builds for speed reasons.
 		debug_assert_eq!(mem::size_of::<T>(), Format::from(unsafe { (*self.outstream).format }).bytes_per_sample());
+
+		// TODO: Maybe actually we should just automatically convert it to the right type if it isn't already.
 
 		assert!(channel < self.channel_count(), "Channel out of range");
 		assert!(frame < self.frame_count(), "Frame out of range");
@@ -226,8 +210,8 @@ impl<'a> OutStreamWriter<'a> {
 		}
 	}
 
-	/// Get the value of a sample/channel. Panics if out of range.
-	pub fn sample<T: Copy>(&self, channel: usize, frame: usize) -> T {
+	/// Get the value of a sample/channel. Panics if out of range or the wrong sized type (in debug builds).
+	pub fn sample_typed<T: Copy>(&self, channel: usize, frame: usize) -> T {
 		assert!(self.write_started);
 
 		// Check format is at least the right size. This is only done in debug builds for speed reasons.
@@ -240,6 +224,60 @@ impl<'a> OutStreamWriter<'a> {
 			let ptr = self.channel_areas[channel].ptr.offset((frame * self.channel_areas[channel].step as usize) as isize) as *mut T;
 			*ptr
 		}
+	}
+
+	/// Set the value of a sample/channel and coerces it to the correct type. Panics if out of range.
+	// pub fn set_sample<T: CastF64>(&mut self, channel: usize, frame: usize, sample: T) {
+	// 	match unsafe { (*self.outstream).format } {
+	// 		bindings::SoundIoFormat::SoundIoFormatS8 => self.set_sample_typed::<i8>(channel, frame, sample.from_f64()),
+	/*		bindings::SoundIoFormat::SoundIoFormatU8 => Format::U8,
+			bindings::SoundIoFormat::SoundIoFormatS16LE => Format::S16LE,
+			bindings::SoundIoFormat::SoundIoFormatS16BE => Format::S16BE,
+			bindings::SoundIoFormat::SoundIoFormatU16LE => Format::U16LE,
+			bindings::SoundIoFormat::SoundIoFormatU16BE => Format::U16BE,
+			bindings::SoundIoFormat::SoundIoFormatS24LE => Format::S24LE,
+			bindings::SoundIoFormat::SoundIoFormatS24BE => Format::S24BE,
+			bindings::SoundIoFormat::SoundIoFormatU24LE => Format::U24LE,
+			bindings::SoundIoFormat::SoundIoFormatU24BE => Format::U24BE,
+			bindings::SoundIoFormat::SoundIoFormatS32LE => Format::S32LE,
+			bindings::SoundIoFormat::SoundIoFormatS32BE => Format::S32BE,
+			bindings::SoundIoFormat::SoundIoFormatU32LE => Format::U32LE,
+			bindings::SoundIoFormat::SoundIoFormatU32BE => Format::U32BE,
+			bindings::SoundIoFormat::SoundIoFormatFloat32LE => Format::Float32LE,
+			bindings::SoundIoFormat::SoundIoFormatFloat32BE => Format::Float32BE,
+			bindings::SoundIoFormat::SoundIoFormatFloat64LE => Format::Float64LE,
+			bindings::SoundIoFormat::SoundIoFormatFloat64BE => Format::Float64BE,*/
+	// 		_ => panic!("Unknown format"),			
+	// 	}
+	// }
+
+	/// Get the value of a sample/channel as an f64. Panics if out of range.
+	// pub fn sample<T: CastF64>(&self, channel: usize, frame: usize) -> T {
+	// 	match unsafe { (*self.outstream).format } {
+	// 		bindings::SoundIoFormat::SoundIoFormatS8 => self.sample_typed::<i8>(channel, frame).from_f?(),
+	/*		bindings::SoundIoFormat::SoundIoFormatU8 => Format::U8,
+			bindings::SoundIoFormat::SoundIoFormatS16LE => Format::S16LE,
+			bindings::SoundIoFormat::SoundIoFormatS16BE => Format::S16BE,
+			bindings::SoundIoFormat::SoundIoFormatU16LE => Format::U16LE,
+			bindings::SoundIoFormat::SoundIoFormatU16BE => Format::U16BE,
+			bindings::SoundIoFormat::SoundIoFormatS24LE => Format::S24LE,
+			bindings::SoundIoFormat::SoundIoFormatS24BE => Format::S24BE,
+			bindings::SoundIoFormat::SoundIoFormatU24LE => Format::U24LE,
+			bindings::SoundIoFormat::SoundIoFormatU24BE => Format::U24BE,
+			bindings::SoundIoFormat::SoundIoFormatS32LE => Format::S32LE,
+			bindings::SoundIoFormat::SoundIoFormatS32BE => Format::S32BE,
+			bindings::SoundIoFormat::SoundIoFormatU32LE => Format::U32LE,
+			bindings::SoundIoFormat::SoundIoFormatU32BE => Format::U32BE,
+			bindings::SoundIoFormat::SoundIoFormatFloat32LE => Format::Float32LE,
+			bindings::SoundIoFormat::SoundIoFormatFloat32BE => Format::Float32BE,
+			bindings::SoundIoFormat::SoundIoFormatFloat64LE => Format::Float64LE,
+			bindings::SoundIoFormat::SoundIoFormatFloat64BE => Format::Float64BE,*/
+		// 	_ => panic!("Unknown format"),			
+		// }
+	// }
+
+	fn foo() {
+
 	}
 }
 

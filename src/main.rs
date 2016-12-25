@@ -24,7 +24,7 @@ impl SineWavePlayer {
 
 		for c in 0..stream.channel_count() {
 			for f in 0..stream.frame_count() {
-				stream.set_sample::<f32>(c, f, (self.phase.sin() * self.amplitude) as f32);
+				stream.set_sample_typed::<f32>(c, f, (self.phase.sin() * self.amplitude) as f32);
 				self.phase += phase_step;
 			}
 		}
