@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use bindings;
+extern crate libsoundio_sys as raw;
 
 use super::types::*;
 use super::device::*;
@@ -26,16 +26,16 @@ use std::marker::PhantomData;
 /// ```
 pub struct Context {
 	// The soundio library instance.
-	soundio: *mut bindings::SoundIo,
+	soundio: *mut raw::SoundIo,
 	app_name: String,
 }
 
-extern fn on_backend_disconnect(_sio: *mut bindings::SoundIo, err: c_int) {
+extern fn on_backend_disconnect(_sio: *mut raw::SoundIo, err: c_int) {
 	// TODO: Allow user-defined callback.
 	println!("Backend disconnected: {}", Error::from(err));
 }
 
-extern fn on_devices_change(_sio: *mut bindings::SoundIo) {
+extern fn on_devices_change(_sio: *mut raw::SoundIo) {
 	println!("Devices changed");
 }
 
@@ -52,7 +52,7 @@ impl Context {
 	/// let mut ctx = soundio::Context::new();
 	/// ```
 	pub fn new(app_name: &str) -> Context {
-		let soundio = unsafe { bindings::soundio_create() };
+		let soundio = unsafe { raw::soundio_create() };
 		if soundio == ptr::null_mut() {
 			// TODO: abort() here instead of panicking.
 			panic!("soundio_create() failed (out of memory).");
@@ -70,8 +70,8 @@ impl Context {
 
 		// Note that libsoundio's default on_backend_disconnect() handler panics!
 		unsafe {
-			(*context.soundio).on_backend_disconnect = on_backend_disconnect as *mut extern fn(*mut bindings::SoundIo, i32);
-			(*context.soundio).on_devices_change = on_devices_change as *mut extern fn(*mut bindings::SoundIo);
+			(*context.soundio).on_backend_disconnect = on_backend_disconnect as *mut extern fn(*mut raw::SoundIo, i32);
+			(*context.soundio).on_devices_change = on_devices_change as *mut extern fn(*mut raw::SoundIo);
 		}
 		context
 	}
@@ -89,7 +89,7 @@ impl Context {
 
 	/// Connect to the default backend.
 	pub fn connect(&mut self) -> Result<()> {
-		let ret = unsafe { bindings::soundio_connect(self.soundio) };
+		let ret = unsafe { raw::soundio_connect(self.soundio) };
 		match ret {
 			0 => Ok(()),
 			_ => Err(ret.into()),
@@ -98,7 +98,7 @@ impl Context {
 
 	/// Connect to the specified backend.
 	pub fn connect_backend(&mut self, backend: Backend) -> Result<()> {
-		let ret = unsafe { bindings::soundio_connect_backend(self.soundio, backend.into()) };
+		let ret = unsafe { raw::soundio_connect_backend(self.soundio, backend.into()) };
 		match ret {
 			0 => Ok(()),
 			_ => Err(ret.into()),
@@ -108,7 +108,7 @@ impl Context {
 	/// Disconnect from the current backend. Does nothing (TODO: Check) if no backend is connected.
 	pub fn disconnect(&mut self) {
 		unsafe {
-			bindings::soundio_disconnect(self.soundio);
+			raw::soundio_disconnect(self.soundio);
 		}
 	}
 
@@ -121,10 +121,10 @@ impl Context {
 
 	/// Return a list of available backends on this system.
 	pub fn available_backends(&self) -> Vec<Backend> {
-		let count = unsafe { bindings::soundio_backend_count(self.soundio) };
+		let count = unsafe { raw::soundio_backend_count(self.soundio) };
 		let mut backends = Vec::with_capacity(count as usize);
 		for i in 0..count {
-			backends.push( unsafe { bindings::soundio_get_backend(self.soundio, i).into() } );
+			backends.push( unsafe { raw::soundio_get_backend(self.soundio, i).into() } );
 		}
 		backends
 	}
@@ -132,14 +132,14 @@ impl Context {
 	/// Flush events. This must be called before enumerating devices.
 	pub fn flush_events(&self) {
 		unsafe {
-			bindings::soundio_flush_events(self.soundio);
+			raw::soundio_flush_events(self.soundio);
 		}
 	}
 
 	/// Wait for events. Call this in a loop.
 	pub fn wait_events(&self) {
 		unsafe {
-			bindings::soundio_wait_events(self.soundio);
+			raw::soundio_wait_events(self.soundio);
 		}
 	}
 
@@ -148,13 +148,13 @@ impl Context {
 	/// different threads and then maybe separate Context into two objects, one that is Send/Sync and one that isn't.
 	pub fn wakeup(&self) {
 		unsafe {
-			bindings::soundio_wakeup(self.soundio);
+			raw::soundio_wakeup(self.soundio);
 		}
 	}
 
 	pub fn force_device_scan(&self) {
 		unsafe {
-			bindings::soundio_force_device_scan(self.soundio);
+			raw::soundio_force_device_scan(self.soundio);
 		}
 	}
 
@@ -162,7 +162,7 @@ impl Context {
 	// Get a device, or None if the index is out of bounds or you never called flush_events()
 	// (you have to call flush_events() before getting devices).
 	pub fn get_input_device(&self, index: usize) -> result::Result<Device, ()> {
-		let device = unsafe { bindings::soundio_get_input_device(self.soundio, index as c_int) };
+		let device = unsafe { raw::soundio_get_input_device(self.soundio, index as c_int) };
 		if device == ptr::null_mut() {
 			return Err(());
 		}
@@ -174,7 +174,7 @@ impl Context {
 	}
 
 	pub fn get_output_device(&self, index: usize) -> result::Result<Device, ()> {
-		let device = unsafe { bindings::soundio_get_output_device(self.soundio, index as c_int) };
+		let device = unsafe { raw::soundio_get_output_device(self.soundio, index as c_int) };
 		if device == ptr::null_mut() {
 			return Err(());
 		}
@@ -190,7 +190,7 @@ impl Context {
 
 	// Returns Err(()) if you never called flush_events().
 	pub fn input_device_count(&self) -> result::Result<usize, ()> {
-		let count = unsafe { bindings::soundio_input_device_count(self.soundio) };
+		let count = unsafe { raw::soundio_input_device_count(self.soundio) };
 		match count {
 			-1 => Err(()),
 			_ => Ok(count as usize),
@@ -198,7 +198,7 @@ impl Context {
 	}
 
 	pub fn output_device_count(&self) -> result::Result<usize, ()> {
-		let count = unsafe { bindings::soundio_output_device_count(self.soundio) };
+		let count = unsafe { raw::soundio_output_device_count(self.soundio) };
 		match count {
 			-1 => Err(()),
 			_ => Ok(count as usize),
@@ -207,7 +207,7 @@ impl Context {
 	
 	// Returns None if you never called flush_events().
 	pub fn default_input_device_index(&self) -> result::Result<usize, ()> {
-		let index = unsafe { bindings::soundio_default_input_device_index(self.soundio) };
+		let index = unsafe { raw::soundio_default_input_device_index(self.soundio) };
 		match index {
 			-1 => Err(()),
 			_ => Ok(index as usize),
@@ -215,7 +215,7 @@ impl Context {
 	}
 
 	pub fn default_output_device_index(&self) -> result::Result<usize, ()> {
-		let index = unsafe { bindings::soundio_default_output_device_index(self.soundio) };
+		let index = unsafe { raw::soundio_default_output_device_index(self.soundio) };
 		match index {
 			-1 => Err(()),
 			_ => Ok(index as usize),
@@ -258,7 +258,7 @@ impl Context {
 impl Drop for Context {
 	fn drop(&mut self) {
 		unsafe {
-			bindings::soundio_destroy(self.soundio);
+			raw::soundio_destroy(self.soundio);
 		}
 	}
 }

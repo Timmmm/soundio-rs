@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use bindings;
+extern crate libsoundio_sys as raw;
 
 use super::types::*;
 use super::util::*;
@@ -13,7 +13,7 @@ use std::os::raw::c_int;
 use std::marker::PhantomData;
 
 pub struct Device<'a> {
-	pub device: *mut bindings::SoundIoDevice,
+	pub device: *mut raw::SoundIoDevice,
 
 	// This is just here to say that Device cannot outlive the Context it was created from. 'a is the lifetime of that Context.
 	pub phantom: PhantomData<&'a ()>,
@@ -43,32 +43,32 @@ impl<'a> Device<'a> {
 
 	pub fn sort_channel_layouts(&self) {
 		unsafe {
-			bindings::soundio_device_sort_channel_layouts(self.device);
+			raw::soundio_device_sort_channel_layouts(self.device);
 		}
 	}
 
 	pub fn supports_format(&self, format: Format) -> bool {
 		unsafe {
-			bindings::soundio_device_supports_format(self.device, format.into()) != 0
+			raw::soundio_device_supports_format(self.device, format.into()) != 0
 		}
 	}
 
 	pub fn supports_layout(&mut self, layout: ChannelLayout) -> bool {
 		unsafe {
 			// TODO: Check this cast is ok.
-			bindings::soundio_device_supports_layout(self.device, &layout.into() as *const _) != 0
+			raw::soundio_device_supports_layout(self.device, &layout.into() as *const _) != 0
 		}
 	}
 
 	pub fn supports_sample_rate(&self, sample_rate: i32) -> bool {
 		unsafe {
-			bindings::soundio_device_supports_sample_rate(self.device, sample_rate as c_int) != 0
+			raw::soundio_device_supports_sample_rate(self.device, sample_rate as c_int) != 0
 		}
 	}
 
 	pub fn nearest_sample_rate(&self, sample_rate: i32) -> i32 {
 		unsafe {
-			bindings::soundio_device_nearest_sample_rate(self.device, sample_rate as c_int) as i32
+			raw::soundio_device_nearest_sample_rate(self.device, sample_rate as c_int) as i32
 		}
 	}
 
@@ -90,7 +90,7 @@ impl<'a> Device<'a> {
 			UnderflowCB: 'b + FnMut(),
 			ErrorCB: 'b + FnMut(Error) {
 
-		let mut outstream = unsafe { bindings::soundio_outstream_create(self.device) };
+		let mut outstream = unsafe { raw::soundio_outstream_create(self.device) };
 		if outstream == ptr::null_mut() {
 			// Note that we should really abort() here (that's what the rest of Rust
 			// does on OOM), but there is no stable way to abort in Rust that I can see.
@@ -128,7 +128,7 @@ impl<'a> Device<'a> {
 			(*stream.userdata.outstream).userdata = stream.userdata.as_mut() as *mut OutStreamUserData as *mut _;
 		}
 
-		match unsafe { bindings::soundio_outstream_open(stream.userdata.outstream) } {
+		match unsafe { raw::soundio_outstream_open(stream.userdata.outstream) } {
 			0 => {},
 			x => return Err(x.into()),
 		};
@@ -151,7 +151,7 @@ impl<'a> Device<'a> {
 impl<'a> Drop for Device<'a> {
 	fn drop(&mut self) {
 		unsafe {
-			bindings::soundio_device_unref(self.device);
+			raw::soundio_device_unref(self.device);
 		}
 	}
 }

@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use bindings;
+extern crate libsoundio_sys as raw;
 
 use std::ffi::CStr;
 use std::fmt;
@@ -112,7 +112,7 @@ impl fmt::Display for Error {
 // Implement the description for errors using soundio_strerror(), and the cause which we never know.
 impl error::Error for Error {
 	fn description(&self) -> &str {
-		let c_str: &CStr = unsafe { CStr::from_ptr(bindings::soundio_strerror((*self).into())) };
+		let c_str: &CStr = unsafe { CStr::from_ptr(raw::soundio_strerror((*self).into())) };
 
 		// TODO: to_str() checks for valid UTF-8 since that what a &str is. Is it safe to assume
 		// soundio_strerror() never returns invalid UTF-8?

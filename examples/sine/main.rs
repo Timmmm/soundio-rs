@@ -30,61 +30,6 @@ impl SineWavePlayer {
 		}
 	}
 }
-/*
-struct WavPlayer {
-}
-
-impl WavPlayer {
-	fn write_callback(&mut self, stream: &mut soundio::OutStreamWriter) {
-	}
-
-	pub fn cache_file(&mut self, filename: &str) {
-
-	}
-
-	pub fn play(filename: &str) {
-
-	}
-}
-*/
-
-// A simple mono audio recorder. All functions are thread-safe
-// so you can simply create an object of this type, it will connect to
-// libsoundio, and then you can read() some samples whenever you like.
-/*struct SoundRecorder {
-	context: soundio::Context,
-	mic: soundio::Device,
-	ring_buffer: ?,
-}
-
-impl SoundRecorder {
-	// Open the default input device as mono at 48 kHz.
-	fn open() -> Result<SoundRecorder, String> {
-
-	}
-
-	fn start(&mut self) {
-
-	}
-
-	fn stop(&mut self) {
-
-	}
-
-	// Get the number of pending samples.
-	fn size(&self) -> usize {
-	}
-
-	// Pop any pending samples from the ring buffer.
-	fn read(&mut self) -> Vec<u16> {
-
-	}
-
-
-	fn read_blocking(&mut self, samples: usize) -> Vec<u16> {
-
-	}
-}*/
 
 // Print sound soundio debug info and play back a sound.
 fn run() -> Result<(), String> {

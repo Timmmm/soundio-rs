@@ -2,20 +2,30 @@
 name = "soundio"
 version = "0.1.0"
 authors = ["Tim Hutt <tdhutt@gmail.com>"]
-links = "libsoundio"
-build = "build.rs"
+license = "MIT"
+readme = "Readme.md"
+keywords = ["audio", "sound"]
+repository = "https://github.com/Timmmm/soundio-rs"
+homepage = "https://github.com/Timmmm/soundio-rs"
+documentation = "https://github.com/Timmmm/soundio-rs"
+description = """
+Bindings to libsoundio for audio input and output.
+"""
 
 [dependencies]
-libc = "0.2.17"
+libc = "0.2"
+libsoundio-sys = { path = "libsoundio-sys", version = "0.1.0" }
 
+# Examples
 
-#[dev-dependencies]
+[[example]]
+name = "player"
+path = "examples/player/main.rs"
 
-# For white noise
-rand = "0.3"
+[[example]]
+name = "recorder"
+path = "examples/recorder/main.rs"
 
-# For scoped threads
+[dev_dependencies]
 crossbeam = "0.2.10"
-
-# For wav playback & recording
 hound = "3.0.0"

@@ -631,8 +631,6 @@ pub struct SoundIoInStream {
 pub enum SoundIoRingBuffer {
 }
 
-#[link(name = "libsoundio")]
-#[link(name = "ole32")]
 extern {
 		
 	// See also ::soundio_version_major, ::soundio_version_minor, ::soundio_version_patch
