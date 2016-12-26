@@ -5,6 +5,7 @@ extern crate libsoundio_sys as raw;
 use super::types::*;
 use super::util::*;
 use super::outstream::*;
+use super::instream::*;
 use super::error::*;
 use super::layout::*;
 
@@ -142,10 +143,76 @@ impl<'a> Device<'a> {
 		Ok(stream)
 	}
 
-	// TODO: Instream.
-	// pub fn open_instream(&mut self) -> InStream {
-	// 	unimplemented!();
-	// }
+
+	// 'a is the lifetime of the Device. The InStream lifetime 'b must be less than or equal to 'a (indicated by `'b: 'a`).
+	// Also the callbacks must have a lifetime greate than or equal to 'b.
+	// The callbacks only need to have the lifetime
+	pub fn open_instream<'b: 'a, ReadCB, OverflowCB, ErrorCB>(
+				&'a self,
+				sample_rate: i32,
+				format: Format,
+				layout: ChannelLayout,
+				latency: f64,
+				read_callback: ReadCB,
+				overflow_callback: Option<OverflowCB>,
+				error_callback: Option<ErrorCB>,
+				) -> Result<InStream<'b>>
+		where
+			ReadCB: 'b + FnMut(&mut InStreamReader),
+			OverflowCB: 'b + FnMut(),
+			ErrorCB: 'b + FnMut(Error) {
+
+		let mut instream = unsafe { raw::soundio_instream_create(self.device) };
+		if instream == ptr::null_mut() {
+			// Note that we should really abort() here (that's what the rest of Rust
+			// does on OOM), but there is no stable way to abort in Rust that I can see.
+			panic!("soundio_instream_create() failed (out of memory).");
+		}
+
+		unsafe {
+			(*instream).sample_rate = sample_rate;
+			(*instream).format = format.into();
+			(*instream).layout = layout.into();
+			(*instream).software_latency = latency;
+			(*instream).read_callback = instream_read_callback as *mut _;
+			(*instream).overflow_callback = instream_overflow_callback as *mut _;
+			(*instream).error_callback = instream_error_callback as *mut _;
+		}
+
+		let mut stream = InStream {
+			userdata: Box::new( InStreamUserData {
+				instream: instream,
+				read_callback: Box::new(read_callback),
+				overflow_callback: match overflow_callback {
+					Some(cb) => Some(Box::new(cb)),
+					None => None,
+				},
+				error_callback: match error_callback {
+					Some(cb) => Some(Box::new(cb)),
+					None => None,
+				}
+			} ),
+			phantom: PhantomData,
+		};
+
+		// Safe userdata pointer.
+		unsafe {
+			(*stream.userdata.instream).userdata = stream.userdata.as_mut() as *mut InStreamUserData as *mut _;
+		}
+
+		match unsafe { raw::soundio_instream_open(stream.userdata.instream) } {
+			0 => {},
+			x => return Err(x.into()),
+		};
+
+		// TODO: Check this is the correct thing to do.
+		match unsafe { (*stream.userdata.instream).layout_error } {
+			0 => {},
+			x => return Err(x.into()),
+		}
+		
+		Ok(stream)
+	}
 }
 
 impl<'a> Drop for Device<'a> {
