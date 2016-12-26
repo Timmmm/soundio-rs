@@ -22,20 +22,24 @@ impl WavRecorder {
 
 		for f in 0..stream.frame_count() {
 			for c in 0..stream.channel_count() {
-				self.writer.write_sample(stream.sample_typed::<i16>(c, f));
+				match self.writer.write_sample(stream.sample_typed::<i16>(c, f)) {
+					Ok(_) => {},
+					Err(e) => println!("Error: {}", e),
+				}
 			}
 		}
 	}
 }
+
 // TODO: I need to implement Sync for WavPlayer so write_callback can be called from a different thread to finished().
 // TODO: I also need to use interior mutability so that write_callback() doesn't mutably borrow self. But it *does* mutate self. The problem is that
 // Rust doesn't know that it is safe to call the other functions while 
 
 // Print sound soundio debug info and play back a sound.
 fn record(filename: &str) -> Result<(), String> {
-
-	let channels = 2;
-	let sample_rate = 48000;
+	// TODO: Probe which channels/sample rates are available.
+	let channels = 1;
+	let sample_rate = 44100;
 
 	let spec = hound::WavSpec {
 		channels: channels,
@@ -97,7 +101,7 @@ fn record(filename: &str) -> Result<(), String> {
 
 		// Start a new scoped thread to wait for sound events (and for the player to be finished).
 		scope.spawn(move || {
-			while exit_loop_ref.load(Ordering::Relaxed) == false/* && !player.finished*/ {
+			while exit_loop_ref.load(Ordering::Relaxed) == false {
 				ctx_ref.wait_events();
 			}
 		});

@@ -36,6 +36,8 @@ pub extern fn outstream_underflow_callback(stream: *mut raw::SoundIoOutStream) {
 
 	if let Some(ref mut cb) = userdata.underflow_callback {
 		cb();
+	} else {
+		println!("Underflow!");
 	}
 }
 
@@ -46,6 +48,8 @@ pub extern fn outstream_error_callback(stream: *mut raw::SoundIoOutStream, err: 
 
 	if let Some(ref mut cb) = userdata.error_callback {
 		cb(err.into());
+	} else {
+		println!("Error: {}", Error::from(err));
 	}
 }
 

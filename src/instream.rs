@@ -36,6 +36,8 @@ pub extern fn instream_overflow_callback(stream: *mut raw::SoundIoInStream) {
 
 	if let Some(ref mut cb) = userdata.overflow_callback {
 		cb();
+	} else {
+		println!("Overflow!");
 	}
 }
 
@@ -46,6 +48,8 @@ pub extern fn instream_error_callback(stream: *mut raw::SoundIoInStream, err: c_
 
 	if let Some(ref mut cb) = userdata.error_callback {
 		cb(err.into());
+	} else {
+		println!("Error: {}", Error::from(err));
 	}
 }
 
