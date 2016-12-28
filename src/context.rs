@@ -51,7 +51,7 @@ impl Context {
 	/// ```
 	/// let mut ctx = soundio::Context::new();
 	/// ```
-	pub fn new(app_name: &str) -> Context {
+	pub fn new() -> Context {
 		let soundio = unsafe { raw::soundio_create() };
 		if soundio == ptr::null_mut() {
 			// TODO: abort() here instead of panicking.
@@ -60,34 +60,56 @@ impl Context {
 
 		let context = Context { 
 			soundio: soundio,
-			app_name: app_name.to_string(),
+			app_name: String::new(),
 		};
-		// TODO: Check this is ok... I think we're ok as long as we always set this when context.app_name is changed.
-		unsafe { (*context.soundio).app_name = context.app_name.as_ptr() as *mut c_char; }
-
-		// TODO: Save a reference here so that we can have user-defined callbacks (see OutStreamUserData).
-		//   (*context.soundio).userdata = &context;
 
 		// Note that libsoundio's default on_backend_disconnect() handler panics!
 		unsafe {
 			(*context.soundio).on_backend_disconnect = on_backend_disconnect as *mut extern fn(*mut raw::SoundIo, i32);
 			(*context.soundio).on_devices_change = on_devices_change as *mut extern fn(*mut raw::SoundIo);
+			(*context.soundio).app_name = ptr::null_mut(); 
+
+		// TODO: Save a reference here so that we can have user-defined callbacks (see OutStreamUserData).
+		//   (*context.soundio).userdata = &context;
 		}
 		context
 	}
 
-	/// Set the app name. This is shown in JACK and some other backends. Any colons are stripped. The max length is ? and the default is ?.
-	pub fn set_app_name(&mut self, name: String) {
+	/// Set the app name. This is shown in JACK and some other backends. Any colons are removed. The max length is ? and the default is ?.
+	/// It must be called before ?? 
+	///
+	/// ```
+	/// let mut ctx = soundio::Context::new();
+	/// ctx.set_app_name("My App");
+	/// ```
+	pub fn set_app_name(&mut self, name: &str) {
 		self.app_name = name.chars().filter(|&x| x != ':').collect();
 		unsafe { (*self.soundio).app_name = self.app_name.as_ptr() as *mut c_char; }
 	}
 
-	/// Get the app name previously set by `set_app_name()`. 
+	/// Get the app name previously set by `set_app_name()`.
+	///
+	/// ```
+	/// let mut ctx = soundio::Context::new();
+	/// assert_eq!(ctx.app_name(), "");
+	/// ctx.set_app_name(":::My App:::");
+	/// assert_eq!(ctx.app_name(), "My App");
+	/// ```
 	pub fn app_name(&self) -> String {
 		self.app_name.clone()
 	}
 
-	/// Connect to the default backend.
+	/// Connect to the default backend. TODO: Which is the default backend? TODO: What if you're already connected?
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = soundio::Context::new();
+	/// match ctx.connect() {
+	/// 	Ok(()) => println!("Connected to {}", ctx.current_backend()),
+	/// 	Err(e) => println!("Couldn't connect: {}", e),
+	/// }
+	/// ```
 	pub fn connect(&mut self) -> Result<()> {
 		let ret = unsafe { raw::soundio_connect(self.soundio) };
 		match ret {
@@ -96,7 +118,17 @@ impl Context {
 		}
 	}
 
-	/// Connect to the specified backend.
+	/// Connect to the specified backend. TODO: What happens if you specify None? TODO: What if you're already connected?
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = soundio::Context::new();
+	/// match ctx.connect(soundio::Backend::Dummy) {
+	/// 	Ok(()) => println!("Connected to dummy backend"),
+	/// 	Err(e) => println!("Couldn't connect: {}", e),
+	/// }
+	/// ```
 	pub fn connect_backend(&mut self, backend: Backend) -> Result<()> {
 		let ret = unsafe { raw::soundio_connect_backend(self.soundio, backend.into()) };
 		match ret {
@@ -106,6 +138,17 @@ impl Context {
 	}
 
 	/// Disconnect from the current backend. Does nothing (TODO: Check) if no backend is connected.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = soundio::Context::new();
+	/// match ctx.connect() {
+	/// 	Ok(()) => println!("Connected to {}", ctx.current_backend()),
+	/// 	Err(e) => { println!("Couldn't connect: {}", e); return; },
+	/// }
+	/// ctx.disconnect();
+	/// ```
 	pub fn disconnect(&mut self) {
 		unsafe {
 			raw::soundio_disconnect(self.soundio);
@@ -113,6 +156,16 @@ impl Context {
 	}
 
 	/// Return the current `Backend`, which may be `Backend::None`.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = soundio::Context::new();
+	/// match ctx.connect() {
+	/// 	Ok(()) => println!("Connected to {}", ctx.current_backend()),
+	/// 	Err(e) => println!("Couldn't connect: {}", e),
+	/// }
+	/// ```
 	pub fn current_backend(&self) -> Backend {
 		unsafe {
 			(*self.soundio).current_backend.into()
@@ -120,6 +173,19 @@ impl Context {
 	}
 
 	/// Return a list of available backends on this system.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = soundio::Context::new();
+	/// match ctx.connect() {
+	/// 	Ok(()) => {
+	/// 		println!("Connected to {}", ctx.current_backend());
+	/// 		println!("Available backends: {}", ctx.available_backends());
+	/// 	},
+	/// 	Err(e) => println!("Couldn't connect: {}", e),
+	/// }
+	/// ```
 	pub fn available_backends(&self) -> Vec<Backend> {
 		let count = unsafe { raw::soundio_backend_count(self.soundio) };
 		let mut backends = Vec::with_capacity(count as usize);
@@ -157,7 +223,6 @@ impl Context {
 			raw::soundio_force_device_scan(self.soundio);
 		}
 	}
-
 
 	// Get a device, or None if the index is out of bounds or you never called flush_events()
 	// (you have to call flush_events() before getting devices).
@@ -267,3 +332,18 @@ impl Drop for Context {
 // TODO: Find out exactly the thread-safety properties of libsoundio.
 unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
+
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+    #[test]
+    fn connect_default_backend() {
+		let mut ctx = Context::new();
+		match ctx.connect() {
+			Ok(()) => println!("Connected to {}", ctx.current_backend()),
+			Err(e) => println!("Couldn't connect: {}", e),
+		}
+    }
+}

@@ -64,7 +64,8 @@ fn play(filename: &str) -> Result<(), String> {
 
 	println!("Soundio version: {}", soundio::version_string());
 
-	let mut ctx = soundio::Context::new("Player");
+	let mut ctx = soundio::Context::new();
+    ctx.set_app_name("Player");
 	ctx.connect()?;
 
 	println!("Current backend: {:?}", ctx.current_backend());

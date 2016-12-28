@@ -778,7 +778,6 @@ extern {
 	// Sorts by channel count, descending.
 	pub fn soundio_sort_channel_layouts(layout: *mut SoundIoChannelLayout, layout_count: c_int);
 
-
 	// Sample Formats
 
 	// Returns -1 on invalid format.

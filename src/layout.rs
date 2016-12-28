@@ -9,8 +9,9 @@ use std::os::raw::c_int;
 use std::ptr;
 use std::cmp::min;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ChannelLayout {
+	// The name is not considered when testing equality.
 	pub name: String,
 	pub channels: Vec<ChannelId>,
 }
@@ -27,7 +28,7 @@ impl From<raw::SoundIoChannelLayout> for ChannelLayout {
 impl From<ChannelLayout> for raw::SoundIoChannelLayout {
     fn from(layout: ChannelLayout) -> raw::SoundIoChannelLayout {
 		raw::SoundIoChannelLayout {
-			name: ptr::null(), // TODO: Allow the name to be set somehow.
+			name: ptr::null(), // TODO: Allow the name to be set somehow? Do I need to?
 			channel_count: layout.channels.len() as c_int,
 			channels: {
 				let mut c = [raw::SoundIoChannelId::SoundIoChannelIdInvalid; raw::SOUNDIO_MAX_CHANNELS];
@@ -39,24 +40,6 @@ impl From<ChannelLayout> for raw::SoundIoChannelLayout {
 		}
     }
 }
-
-// impl ChannelLayout {
-// 	// I have this function too because it lets you set the name.
-// 	pub fn into_native(&self) -> raw::SoundIoChannelLayout {
-// 		raw::SoundIoChannelLayout {
-// 			// TODO: I probably need a PhantomData here...
-// 			name: self.name.as_ptr() as *const c_char, // TODO: This should probably be Latin1, but I doubt it will cause issues.
-// 			channel_count: self.channels.len() as c_int,
-// 			channels: {
-// 				let mut c = [raw::SoundIoChannelId::SoundIoChannelIdInvalid; raw::SOUNDIO_MAX_CHANNELS];
-// 				for i in 0..min(c.len(), self.channels.len()) {
-// 					c[i] = self.channels[i].into();
-// 				}
-// 				c
-// 			},
-// 		}
-// 	}
-// }
 
 impl ChannelLayout {
 	pub fn get_builtin() -> Vec<ChannelLayout> {
@@ -74,26 +57,52 @@ impl ChannelLayout {
 		}
 	}
 
-	pub fn best_matching_channel_layout(_preferred_layouts: &Vec<ChannelLayout>, _available_layouts: &Vec<ChannelLayout>) -> Option<ChannelLayout> {
-
-		unimplemented!();
+	// Iterates over preferred_layouts. Returns the first channel layout in
+	// preferred_layouts which matches (using ==) one of the channel layouts in
+	// available_layouts. Returns None if none matches.
+	//
+	// TODO: Test this!
+	pub fn best_matching_channel_layout(preferred_layouts: &Vec<ChannelLayout>, available_layouts: &Vec<ChannelLayout>) -> Option<ChannelLayout> {
+		for preferred_layout in preferred_layouts {
+			if available_layouts.contains(preferred_layout) {
+				return Some(preferred_layout.clone());
+			}
+		}
+		None
 	}
 
 	// This seems a bit unnecessary.
 	pub fn find_channel(&self, channel: ChannelId) -> Option<usize> {
-
-		// There is a C function for this but it seems simpler to do it in Rust.
+		// There is a C function for this but it seems simpler and safer to do it in Rust.
 		self.channels.iter().position(|&c| c == channel)
 	}
 
-	// Populate the name field with the built-in name if this layout matches. Returns true if it did.
+	// Populate the name field with the built-in name if this layout matches one of the built-in layouts.
+	// Returns true if it did.
+	//
+	// TODO: Test!
 	pub fn detect_builtin(&mut self) -> bool {
+		let mut raw_layout = raw::SoundIoChannelLayout::from(self.clone());
 
-		unimplemented!();
+		if unsafe { raw::soundio_channel_layout_detect_builtin(&mut raw_layout) } != 0 {
+			self.name = latin1_to_string(raw_layout.name);
+			return true;
+		}
+		false
 	}
 
-	pub fn sort(_layouts: &mut [ChannelLayout]) {
-
-		unimplemented!();
+	// Sort by channel count, descending.
+	pub fn sort(layouts: &mut [ChannelLayout]) {
+		// Again this is easier to do in Rust. It literally sorts by channel count.
+		layouts.sort_by(|a, b| a.channels.len().cmp(&b.channels.len()));
 	}
 }
+
+// Equality testing for layouts. The channels must be the same
+// IDs and in the same order. The layout name is ignored.
+impl PartialEq for ChannelLayout {
+    fn eq(&self, other: &ChannelLayout) -> bool {
+        self.channels == other.channels
+    }
+}
+impl Eq for ChannelLayout {}

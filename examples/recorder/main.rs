@@ -53,7 +53,8 @@ fn record(filename: &str) -> Result<(), String> {
 
 	println!("Soundio version: {}", soundio::version_string());
 
-	let mut ctx = soundio::Context::new("Recorder");
+	let mut ctx = soundio::Context::new();
+	ctx.set_app_name("Recorder");
 	ctx.connect()?;
 
 	println!("Current backend: {:?}", ctx.current_backend());
