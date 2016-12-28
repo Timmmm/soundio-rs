@@ -1,9 +1,7 @@
-#![allow(dead_code)]
-
 extern crate libsoundio_sys as raw;
 
 use super::error::*;
-use super::types::*;
+use super::format::*;
 
 use std::ptr;
 use std::os::raw::{c_int, c_double};
@@ -229,7 +227,7 @@ impl<'a> OutStreamWriter<'a> {
 		}
 	}
 
-	/// Set the value of a sample/channel and coerces it to the correct type. Panics if out of range.
+	// Set the value of a sample/channel and coerces it to the correct type. Panics if out of range.
 	// pub fn set_sample<T: CastF64>(&mut self, channel: usize, frame: usize, sample: T) {
 	// 	match unsafe { (*self.outstream).format } {
 	// 		raw::SoundIoFormat::SoundIoFormatS8 => self.set_sample_typed::<i8>(channel, frame, sample.from_f64()),
@@ -254,7 +252,7 @@ impl<'a> OutStreamWriter<'a> {
 	// 	}
 	// }
 
-	/// Get the value of a sample/channel as an f64. Panics if out of range.
+	// Get the value of a sample/channel as an f64. Panics if out of range.
 	// pub fn sample<T: CastF64>(&self, channel: usize, frame: usize) -> T {
 	// 	match unsafe { (*self.outstream).format } {
 	// 		raw::SoundIoFormat::SoundIoFormatS8 => self.sample_typed::<i8>(channel, frame).from_f?(),
@@ -278,10 +276,6 @@ impl<'a> OutStreamWriter<'a> {
 		// 	_ => panic!("Unknown format"),			
 		// }
 	// }
-
-	fn foo() {
-
-	}
 }
 
 impl<'a> Drop for OutStreamWriter<'a> {

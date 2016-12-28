@@ -1,9 +1,7 @@
-#![allow(dead_code)]
-
 extern crate libsoundio_sys as raw;
 
-use super::types::*;
 use super::util::*;
+use super::channels::*;
 
 use std::os::raw::c_int;
 use std::ptr;
@@ -11,8 +9,9 @@ use std::cmp::min;
 
 #[derive(Debug, Clone)]
 pub struct ChannelLayout {
-	// The name is not considered when testing equality.
+	// The name of the layout. This is mostly useful when enumerating built-in layouts.
 	pub name: String,
+	// A list of channels. Order is significant.
 	pub channels: Vec<ChannelId>,
 }
 

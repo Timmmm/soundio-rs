@@ -1,9 +1,7 @@
-#![allow(dead_code)]
-
 extern crate libsoundio_sys as raw;
 
 use super::error::*;
-use super::types::*;
+use super::format::*;
 
 use std::ptr;
 use std::os::raw::{c_int, c_double};
@@ -221,58 +219,56 @@ impl<'a> InStreamReader<'a> {
 		}
 	}
 
-	/// Set the value of a sample/channel and coerces it to the correct type. Panics if out of range.
+	// Set the value of a sample/channel and coerces it to the correct type. Panics if out of range.
 	// pub fn set_sample<T: CastF64>(&mut self, channel: usize, frame: usize, sample: T) {
 	// 	match unsafe { (*self.instream).format } {
 	// 		raw::SoundIoFormat::SoundIoFormatS8 => self.set_sample_typed::<i8>(channel, frame, sample.from_f64()),
-	/*		raw::SoundIoFormat::SoundIoFormatU8 => Format::U8,
-			raw::SoundIoFormat::SoundIoFormatS16LE => Format::S16LE,
-			raw::SoundIoFormat::SoundIoFormatS16BE => Format::S16BE,
-			raw::SoundIoFormat::SoundIoFormatU16LE => Format::U16LE,
-			raw::SoundIoFormat::SoundIoFormatU16BE => Format::U16BE,
-			raw::SoundIoFormat::SoundIoFormatS24LE => Format::S24LE,
-			raw::SoundIoFormat::SoundIoFormatS24BE => Format::S24BE,
-			raw::SoundIoFormat::SoundIoFormatU24LE => Format::U24LE,
-			raw::SoundIoFormat::SoundIoFormatU24BE => Format::U24BE,
-			raw::SoundIoFormat::SoundIoFormatS32LE => Format::S32LE,
-			raw::SoundIoFormat::SoundIoFormatS32BE => Format::S32BE,
-			raw::SoundIoFormat::SoundIoFormatU32LE => Format::U32LE,
-			raw::SoundIoFormat::SoundIoFormatU32BE => Format::U32BE,
-			raw::SoundIoFormat::SoundIoFormatFloat32LE => Format::Float32LE,
-			raw::SoundIoFormat::SoundIoFormatFloat32BE => Format::Float32BE,
-			raw::SoundIoFormat::SoundIoFormatFloat64LE => Format::Float64LE,
-			raw::SoundIoFormat::SoundIoFormatFloat64BE => Format::Float64BE,*/
+			// raw::SoundIoFormat::SoundIoFormatU8 => Format::U8,
+			// raw::SoundIoFormat::SoundIoFormatS16LE => Format::S16LE,
+			// raw::SoundIoFormat::SoundIoFormatS16BE => Format::S16BE,
+			// raw::SoundIoFormat::SoundIoFormatU16LE => Format::U16LE,
+			// raw::SoundIoFormat::SoundIoFormatU16BE => Format::U16BE,
+			// raw::SoundIoFormat::SoundIoFormatS24LE => Format::S24LE,
+			// raw::SoundIoFormat::SoundIoFormatS24BE => Format::S24BE,
+			// raw::SoundIoFormat::SoundIoFormatU24LE => Format::U24LE,
+			// raw::SoundIoFormat::SoundIoFormatU24BE => Format::U24BE,
+			// raw::SoundIoFormat::SoundIoFormatS32LE => Format::S32LE,
+			// raw::SoundIoFormat::SoundIoFormatS32BE => Format::S32BE,
+			// raw::SoundIoFormat::SoundIoFormatU32LE => Format::U32LE,
+			// raw::SoundIoFormat::SoundIoFormatU32BE => Format::U32BE,
+			// raw::SoundIoFormat::SoundIoFormatFloat32LE => Format::Float32LE,
+			// raw::SoundIoFormat::SoundIoFormatFloat32BE => Format::Float32BE,
+			// raw::SoundIoFormat::SoundIoFormatFloat64LE => Format::Float64LE,
+			// raw::SoundIoFormat::SoundIoFormatFloat64BE => Format::Float64BE,
 	// 		_ => panic!("Unknown format"),			
 	// 	}
 	// }
 
-	/// Get the value of a sample/channel as an f64. Panics if out of range.
+	// Get the value of a sample/channel as an f64. Panics if out of range.
 	// pub fn sample(&self, channel: usize, frame: usize) -> f64 {
 	// 	match unsafe { (*self.instream).format } {
     //         raw::SoundIoFormat::SoundIoFormatS8 => self.sample_typed::<i8>(channel, frame).to_f64(),
-	/*		raw::SoundIoFormat::SoundIoFormatU8 => Format::U8,
-			raw::SoundIoFormat::SoundIoFormatS16LE => Format::S16LE,
-			raw::SoundIoFormat::SoundIoFormatS16BE => Format::S16BE,
-			raw::SoundIoFormat::SoundIoFormatU16LE => Format::U16LE,
-			raw::SoundIoFormat::SoundIoFormatU16BE => Format::U16BE,
-			raw::SoundIoFormat::SoundIoFormatS24LE => Format::S24LE,
-			raw::SoundIoFormat::SoundIoFormatS24BE => Format::S24BE,
-			raw::SoundIoFormat::SoundIoFormatU24LE => Format::U24LE,
-			raw::SoundIoFormat::SoundIoFormatU24BE => Format::U24BE,
-			raw::SoundIoFormat::SoundIoFormatS32LE => Format::S32LE,
-			raw::SoundIoFormat::SoundIoFormatS32BE => Format::S32BE,
-			raw::SoundIoFormat::SoundIoFormatU32LE => Format::U32LE,
-			raw::SoundIoFormat::SoundIoFormatU32BE => Format::U32BE,
-			raw::SoundIoFormat::SoundIoFormatFloat32LE => Format::Float32LE,
-			raw::SoundIoFormat::SoundIoFormatFloat32BE => Format::Float32BE,
-			raw::SoundIoFormat::SoundIoFormatFloat64LE => Format::Float64LE,
-			raw::SoundIoFormat::SoundIoFormatFloat64BE => Format::Float64BE,*/
+			// raw::SoundIoFormat::SoundIoFormatU8 => Format::U8,
+			// raw::SoundIoFormat::SoundIoFormatS16LE => Format::S16LE,
+			// raw::SoundIoFormat::SoundIoFormatS16BE => Format::S16BE,
+			// raw::SoundIoFormat::SoundIoFormatU16LE => Format::U16LE,
+			// raw::SoundIoFormat::SoundIoFormatU16BE => Format::U16BE,
+			// raw::SoundIoFormat::SoundIoFormatS24LE => Format::S24LE,
+			// raw::SoundIoFormat::SoundIoFormatS24BE => Format::S24BE,
+			// raw::SoundIoFormat::SoundIoFormatU24LE => Format::U24LE,
+			// raw::SoundIoFormat::SoundIoFormatU24BE => Format::U24BE,
+			// raw::SoundIoFormat::SoundIoFormatS32LE => Format::S32LE,
+			// raw::SoundIoFormat::SoundIoFormatS32BE => Format::S32BE,
+			// raw::SoundIoFormat::SoundIoFormatU32LE => Format::U32LE,
+			// raw::SoundIoFormat::SoundIoFormatU32BE => Format::U32BE,
+			// raw::SoundIoFormat::SoundIoFormatFloat32LE => Format::Float32LE,
+			// raw::SoundIoFormat::SoundIoFormatFloat32BE => Format::Float32BE,
+			// raw::SoundIoFormat::SoundIoFormatFloat64LE => Format::Float64LE,
+			// raw::SoundIoFormat::SoundIoFormatFloat64BE => Format::Float64BE,
 	// 		_ => panic!("Unknown format"),			
 	// 	}
 	// }
-	fn foo() {
 
-	}
 }
 
 impl<'a> Drop for InStreamReader<'a> {

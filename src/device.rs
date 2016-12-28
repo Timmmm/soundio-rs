@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 extern crate libsoundio_sys as raw;
 
 use super::types::*;
@@ -8,6 +6,7 @@ use super::outstream::*;
 use super::instream::*;
 use super::error::*;
 use super::layout::*;
+use super::format::*;
 
 use std::ptr;
 use std::os::raw::c_int;

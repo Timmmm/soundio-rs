@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 extern crate libsoundio_sys as raw;
 
 mod types;
@@ -10,6 +8,9 @@ mod outstream;
 mod util;
 mod layout;
 mod error;
+mod channels;
+mod backend;
+mod format;
 
 // TODO: Don't re-export absolutely everything.
 pub use self::types::*;
@@ -20,6 +21,9 @@ pub use self::outstream::*;
 pub use self::util::*;
 pub use self::layout::*;
 pub use self::error::*;
+pub use self::channels::*;
+pub use self::backend::*;
+pub use self::format::*;
 
 /// Return the libsoundio version string, for example `"1.0.2"`.
 ///

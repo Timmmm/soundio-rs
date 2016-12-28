@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 extern crate libsoundio_sys as raw;
 
 use std::ffi::CStr;

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::ffi::CStr;
 use std::ptr;
 use std::os::raw::c_char;
