@@ -255,7 +255,7 @@ impl fmt::Display for ChannelId {
 /// # Examples
 ///
 /// ```
-/// println!("Stereo Layout: {:?}", ChannelLayout::get_builtin(ChannelLayoutId::Stereo));
+/// println!("Stereo Layout: {:?}", soundio::ChannelLayout::get_builtin(soundio::ChannelLayoutId::Stereo));
 /// ```
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ChannelLayoutId {

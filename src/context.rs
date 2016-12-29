@@ -97,7 +97,9 @@ impl Context {
 		self.app_name.clone()
 	}
 
-	/// Connect to the default backend. TODO: Which is the default backend? TODO: What if you're already connected?
+	/// Connect to the default backend, trying them in the order returned by `available_backends()`.
+	///
+	/// Returns `soundio::Error::Invalid` if you are already connected.
 	///
 	/// # Examples
 	///
@@ -116,13 +118,15 @@ impl Context {
 		}
 	}
 
-	/// Connect to the specified backend. TODO: What happens if you specify None? TODO: What if you're already connected?
+	/// Connect to the specified backend.
+	///
+	/// Returns `soundio::Error::Invalid` if you are already connected.
 	///
 	/// # Examples
 	///
 	/// ```
 	/// let mut ctx = soundio::Context::new();
-	/// match ctx.connect(soundio::Backend::Dummy) {
+	/// match ctx.connect_backend(soundio::Backend::Dummy) {
 	/// 	Ok(()) => println!("Connected to dummy backend"),
 	/// 	Err(e) => println!("Couldn't connect: {}", e),
 	/// }
@@ -135,7 +139,9 @@ impl Context {
 		}
 	}
 
-	/// Disconnect from the current backend. Does nothing (TODO: Check) if no backend is connected.
+	/// Disconnect from the current backend. Does nothing if no backend is connected.
+	/// It is usually not necessary to call this manually; the backend will disconnect
+	/// automatically when `Context` is dropped.
 	///
 	/// # Examples
 	///
@@ -179,7 +185,7 @@ impl Context {
 	/// match ctx.connect() {
 	/// 	Ok(()) => {
 	/// 		println!("Connected to {}", ctx.current_backend());
-	/// 		println!("Available backends: {}", ctx.available_backends());
+	/// 		println!("Available backends: {:?}", ctx.available_backends());
 	/// 	},
 	/// 	Err(e) => println!("Couldn't connect: {}", e),
 	/// }
@@ -321,6 +327,7 @@ impl Context {
 impl Drop for Context {
 	fn drop(&mut self) {
 		unsafe {
+			// This also disconnects if necessary.
 			raw::soundio_destroy(self.soundio);
 		}
 	}

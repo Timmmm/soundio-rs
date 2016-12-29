@@ -16,7 +16,7 @@ use std::fmt;
 /// # Examples
 ///
 /// ```
-/// println!("The name of PulseAudio is {}", Backend::PulseAudio);
+/// println!("The name of PulseAudio is {}", soundio::Backend::PulseAudio);
 /// ```
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Backend {
