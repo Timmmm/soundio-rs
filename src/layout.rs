@@ -41,13 +41,21 @@ impl From<ChannelLayout> for raw::SoundIoChannelLayout {
 }
 
 impl ChannelLayout {
-	pub fn get_builtin() -> Vec<ChannelLayout> {
+	pub fn get_all_builtin() -> Vec<ChannelLayout> {
 		let count = unsafe { raw::soundio_channel_layout_builtin_count() };
 		let mut layouts = Vec::new();
 		for i in 0..count {
 			layouts.push( unsafe { (*raw::soundio_channel_layout_get_builtin(i)).into() } );
 		}
 		layouts
+	}
+
+	pub fn get_builtin(id: ChannelLayoutId) -> ChannelLayout {
+		unsafe {
+			(*raw::soundio_channel_layout_get_builtin(
+				raw::SoundIoChannelLayoutId::from(id) as _
+				)).into()
+		}
 	}
 
 	pub fn get_default(channel_count: i32) -> ChannelLayout {

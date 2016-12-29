@@ -1,8 +1,23 @@
 extern crate libsoundio_sys as raw;
 
-use std::ffi::CStr;
+use super::util::*;
+
 use std::fmt;
 
+/// Backend indicates one of the supported audio backends.
+///
+/// Linux supports Also, and optionally PulseAudio, and JACK.
+///
+/// Windows supports Wasapi, and MacOS supports CoreAudio. All platforms
+/// support the Dummy backend.
+///
+/// The Backend type supports the `Display` trait, so you can use it in `println!()`.
+///
+/// # Examples
+///
+/// ```
+/// println!("The name of PulseAudio is {}", Backend::PulseAudio);
+/// ```
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Backend {
 	None,
@@ -44,13 +59,9 @@ impl From<Backend> for raw::SoundIoBackend {
 
 impl fmt::Display for Backend {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		// TODO: This may be overkill - I could just use the #[derive(Debug)] output; it's nearly identical.
-
-		let c_str: &CStr = unsafe { CStr::from_ptr(raw::soundio_backend_name((*self).into())) };
-
-		// TODO: to_str() checks for valid UTF-8 since that what a &str is. Is it safe to assume
-		// soundio_strerror() never returns invalid UTF-8?
-		
-		f.write_str(c_str.to_str().unwrap())
+        // In the C source these only use ASCII characters so it is technically ambiguous
+        // whether this is UTF-8 or Latin1.
+        let s = latin1_to_string( unsafe { raw::soundio_backend_name((*self).into()) } );
+		f.write_str(&s)
 	}
 }

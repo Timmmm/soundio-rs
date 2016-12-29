@@ -1,9 +1,10 @@
 extern crate libsoundio_sys as raw;
 
-use std::ffi::CStr;
+use super::util::*;
+
 use std::fmt;
 
-/// Specifies where a channel is physically located.
+/// ChannelId indicates what kind of channel a channel is (left, right, LFE, etc.).
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ChannelId {
 	Invalid,
@@ -239,20 +240,23 @@ impl From<ChannelId> for raw::SoundIoChannelId {
     }
 }
 
-
 impl fmt::Display for ChannelId {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let c_str: &CStr = unsafe { CStr::from_ptr(raw::soundio_get_channel_name((*self).into())) };
-
-		// TODO: to_str() checks for valid UTF-8 since that what a &str is. Is it safe to assume
-		// soundio_strerror() never returns invalid UTF-8?
-		
-		f.write_str(c_str.to_str().unwrap())
+       // In the C source these only use ASCII characters so it is technically ambiguous
+        // whether this is UTF-8 or Latin1.
+        let s = latin1_to_string( unsafe { raw::soundio_get_channel_name((*self).into()) } );
+		f.write_str(&s)
 	}
 }
 
-
 /// Built-in channel layouts for convenience.
+/// This can be used with `ChannelLayout::get_builtin()`.
+///
+/// # Examples
+///
+/// ```
+/// println!("Stereo Layout: {:?}", ChannelLayout::get_builtin(ChannelLayoutId::Stereo));
+/// ```
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ChannelLayoutId {
 	Mono,
@@ -282,7 +286,6 @@ pub enum ChannelLayoutId {
 	C7Point1WideBack,
 	Octagonal,
 }
-
 
 impl From<raw::SoundIoChannelLayoutId> for ChannelLayoutId {
     fn from(channel_layout_id: raw::SoundIoChannelLayoutId) -> ChannelLayoutId {
