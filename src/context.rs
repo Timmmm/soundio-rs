@@ -182,13 +182,7 @@ impl Context {
 	///
 	/// ```
 	/// let mut ctx = soundio::Context::new();
-	/// match ctx.connect() {
-	/// 	Ok(()) => {
-	/// 		println!("Connected to {}", ctx.current_backend());
-	/// 		println!("Available backends: {:?}", ctx.available_backends());
-	/// 	},
-	/// 	Err(e) => println!("Couldn't connect: {}", e),
-	/// }
+	/// println!("Available backends: {:?}", ctx.available_backends());
 	/// ```
 	pub fn available_backends(&self) -> Vec<Backend> {
 		let count = unsafe { raw::soundio_backend_count(self.soundio) };
@@ -342,13 +336,20 @@ unsafe impl Sync for Context {}
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use super::super::backend::*;
 
     #[test]
     fn connect_default_backend() {
 		let mut ctx = Context::new();
-		match ctx.connect() {
+		match ctx.connect_backend(Backend::Dummy) {
 			Ok(()) => println!("Connected to {}", ctx.current_backend()),
 			Err(e) => println!("Couldn't connect: {}", e),
 		}
     }
+
+	#[test]
+	fn available_backends() {
+		let ctx = Context::new();
+		println!("Available backends: {:?}", ctx.available_backends());
+	}
 }

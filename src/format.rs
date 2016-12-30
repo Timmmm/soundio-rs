@@ -3,29 +3,47 @@ extern crate libsoundio_sys as raw;
 use std::ffi::CStr;
 use std::fmt;
 
-/// For your convenience, Native Endian and Foreign Endian constants are defined
-/// which point to the respective SoundIoFormat values.
+/// Format defines the format of the samples. In 90% of cases you'll want `S16LE`, or maybe `Float64LE`.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Format {
+    /// Invalid format
 	Invalid,
-	S8,        // Signed 8 bit
-	U8,        // Unsigned 8 bit
-	S16LE,     // Signed 16 bit Little Endian
-	S16BE,     // Signed 16 bit Big Endian
-	U16LE,     // Unsigned 16 bit Little Endian
-	U16BE,     // Unsigned 16 bit Little Endian
-	S24LE,     // Signed 24 bit Little Endian using low three bytes in 32-bit word
-	S24BE,     // Signed 24 bit Big Endian using low three bytes in 32-bit word
-	U24LE,     // Unsigned 24 bit Little Endian using low three bytes in 32-bit word
-	U24BE,     // Unsigned 24 bit Big Endian using low three bytes in 32-bit word
-	S32LE,     // Signed 32 bit Little Endian
-	S32BE,     // Signed 32 bit Big Endian
-	U32LE,     // Unsigned 32 bit Little Endian
-	U32BE,     // Unsigned 32 bit Big Endian
-	Float32LE, // Float 32 bit Little Endian, Range -1.0 to 1.0
-	Float32BE, // Float 32 bit Big Endian, Range -1.0 to 1.0
-	Float64LE, // Float 64 bit Little Endian, Range -1.0 to 1.0
-	Float64BE, // Float 64 bit Big Endian, Range -1.0 to 1.0
+    /// Signed 8 bit
+    S8,
+    /// Unsigned 8 bit
+    U8,
+    /// Signed 16 bit Little Endian
+    S16LE,
+    /// Signed 16 bit Big Endian
+    S16BE,
+    /// Unsigned 16 bit Little Endian
+    U16LE,
+    /// Unsigned 16 bit Little Endian
+    U16BE,
+    /// Signed 24 bit Little Endian using low three bytes in 32-bit word
+    S24LE,
+    /// Signed 24 bit Big Endian using low three bytes in 32-bit word
+    S24BE,
+    /// Unsigned 24 bit Little Endian using low three bytes in 32-bit word
+    U24LE,
+    /// Unsigned 24 bit Big Endian using low three bytes in 32-bit word
+    U24BE,
+    /// Signed 32 bit Little Endian
+    S32LE,
+    /// Signed 32 bit Big Endian
+    S32BE,
+    /// Unsigned 32 bit Little Endian
+    U32LE,
+    /// Unsigned 32 bit Big Endian
+    U32BE,
+    /// Float 32 bit Little Endian, Range -1.0 to 1.0
+    Float32LE,
+    /// Float 32 bit Big Endian, Range -1.0 to 1.0
+    Float32BE,
+    /// Float 64 bit Little Endian, Range -1.0 to 1.0
+    Float64LE,
+    /// Float 64 bit Big Endian, Range -1.0 to 1.0
+    Float64BE,
 }
 
 // TODO: Add functions / constants for native / foreign endian. 
@@ -83,12 +101,44 @@ impl From<Format> for raw::SoundIoFormat {
 }
 
 impl Format {
+    /// Returns the number of byte used per sample. Note that this
+    /// is the size of the storage used for the sample, not the number of
+    /// bits used. For example S24LE returns 4.
+    ///
+    /// The returned values are specifically:
+    ///
+    /// * S8: 1 
+    /// * U8: 1 
+    /// * S16LE: 2 
+    /// * S16BE: 2 
+    /// * U16LE: 2 
+    /// * U16BE: 2 
+    /// * S24LE: 4 
+    /// * S24BE: 4 
+    /// * U24LE: 4 
+    /// * U24BE: 4 
+    /// * S32LE: 4 
+    /// * S32BE: 4 
+    /// * U32LE: 4 
+    /// * U32BE: 4 
+    /// * Float32LE: 4 
+    /// * Float32BE: 4 
+    /// * Float64LE: 8 
+    /// * Float64BE: 8 
+    /// * Invalid: -1
 	pub fn bytes_per_sample(&self) -> usize {
 		unsafe { raw::soundio_get_bytes_per_sample((*self).into()) as usize }
 	}
+
+    /// Returns the number of bytes per frame.
+    /// A frame is one sample for all channels so this is simply the number
+    /// of bytes for a sample `bytes_per_sample()` multiplied by the number of channels.
 	pub fn bytes_per_frame(&self, channel_count: usize) -> usize {
 		self.bytes_per_sample() * channel_count
 	}
+
+    /// Returns the number of bytes per second, which is the number of bytes
+    /// per frame multiplied by the number of frames per second (the sample rate).
 	pub fn bytes_per_second(&self, channel_count: usize, sample_rate: usize) -> usize {
 		self.bytes_per_sample() * channel_count * sample_rate
 	}
