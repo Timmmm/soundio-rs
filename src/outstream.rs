@@ -187,9 +187,10 @@ impl<'a> OutStream<'a> {
 	/// For JACK, this value is always equal to
 	/// SoundIoDevice::software_latency_current of the device.
 	pub fn software_latency(&self) -> f64 {
-		unimplemented!()
+		unsafe {
+			(*self.userdata.outstream).software_latency as _
+		}
 	}
-
 
     /// Optional: Name of the stream. Defaults to "SoundIoOutStream"
     /// PulseAudio uses this for the stream name.
@@ -198,18 +199,21 @@ impl<'a> OutStream<'a> {
     /// WASAPI uses this for the session display name.
     /// Must not contain a colon (":").
 	pub fn name(&self) -> String {
-		unimplemented!()
-
+		unsafe {
+			utf8_to_string(*self.userdata.outstream).name)
+		}
 	}
 
 	pub fn bytes_per_frame(&self) -> i32 {
-		unimplemented!()
-
+		unsafe {
+			(*self.userdata.outstream).bytes_per_frame as _
+		}
 	}
 
 	pub fn bytes_per_sample(&self) -> i32 {
-		unimplemented!()
-
+		unsafe {
+			(*self.userdata.outstream).bytes_per_sample as _
+		}
 	}
 }
 
