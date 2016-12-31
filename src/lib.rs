@@ -1,3 +1,6 @@
+//! TODO: Crate documentation
+
+
 extern crate libsoundio_sys as raw;
 
 mod types;
@@ -81,5 +84,4 @@ pub fn have_backend(backend: Backend) -> bool {
 		raw::soundio_have_backend(backend.into()) != 0
 	}
 }
-
 

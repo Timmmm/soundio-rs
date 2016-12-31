@@ -28,13 +28,48 @@ pub struct Context {
 	app_name: String,
 }
 
+/// Optional callback. Called when the backend disconnects. For example,
+/// when the JACK server shuts down. When this happens, listing devices
+/// and opening streams will always fail with
+/// SoundIoErrorBackendDisconnected. This callback is only called during a
+/// call to ::soundio_flush_events or ::soundio_wait_events.
+/// If you do not supply a callback, the default will crash your program
+/// with an error message. This callback is also called when the thread
+/// that retrieves device information runs into an unrecoverable condition
+/// such as running out of memory.
+///
+/// Possible errors:
+/// * #SoundIoErrorBackendDisconnected
+/// * #SoundIoErrorNoMem
+/// * #SoundIoErrorSystemResources
+/// * #SoundIoErrorOpeningDevice - unexpected problem accessing device
+///   information
 extern fn on_backend_disconnect(_sio: *mut raw::SoundIo, err: c_int) {
 	// TODO: Allow user-defined callback.
 	println!("Backend disconnected: {}", Error::from(err));
 }
 
+/// Called when the list of devices change. Only called
+/// during a call to ::soundio_flush_events or ::soundio_wait_events.
 extern fn on_devices_change(_sio: *mut raw::SoundIo) {
 	println!("Devices changed");
+}
+
+/// Optional callback. Called from an unknown thread that you should not use
+/// to call any soundio functions. You may use this to signal a condition
+/// variable to wake up. Called when ::soundio_wait_events would be woken up.
+extern fn on_events_signal(_sio: *mut raw::SoundIo) {
+
+}
+
+/// Optional: Real time priority warning.
+/// This callback is fired when making thread real-time priority failed. By
+/// default, it will print to stderr only the first time it is called
+/// a message instructing the user how to configure their system to allow
+/// real-time priority threads. This must be set to a function not NULL.
+/// To silence the warning, assign this to a function that does nothing.
+extern fn emit_rtprio_warning() {
+
 }
 
 impl Context {
@@ -43,6 +78,8 @@ impl Context {
 	///
 	/// This panics if libsoundio fails to create the context object. This only happens due to out-of-memory conditions
 	/// and Rust also panics (aborts actually) under those conditions in the standard library so this behaviour seemed acceptable.
+	///
+	/// You can create multiple `Context` instances to connect to multiple backends.
 	///
 	/// # Examples
 	///
@@ -98,8 +135,14 @@ impl Context {
 	}
 
 	/// Connect to the default backend, trying them in the order returned by `available_backends()`.
+	/// It will fail with `Error::Invalid` if this instance is already connected to a backend.
 	///
-	/// Returns `soundio::Error::Invalid` if you are already connected.
+	/// # Return Values
+	///
+	/// * `soundio::Error::Invalid` if you are already connected.
+	/// * `soundio::Error::NoMem`
+	/// * `soundio::Error::SystemResources`
+	/// * `soundio::Error::NoSuchClient` when JACK returns `JackNoSuchClient`.
 	///
 	/// # Examples
 	///
@@ -118,9 +161,18 @@ impl Context {
 		}
 	}
 
-	/// Connect to the specified backend.
+	/// Connect to the specified backend. It will fail with `Error::Invalid` if this instance
+	/// is already connected to a backend.
 	///
-	/// Returns `soundio::Error::Invalid` if you are already connected.
+	/// # Return Values
+	///
+	/// * `soundio::Error::Invalid` if you are already connected or the backend was invalid.
+	/// * `soundio::Error::NoMem`
+	/// * `soundio::Error::BackendUnavailable` if the backend was not compiled in.
+	/// * `soundio::Error::SystemResources`
+	/// * `soundio::Error::NoSuchClient` when JACK returns `JackNoSuchClient`.
+	/// * `soundio::Error::InitAudioBackend` if the requested backend is not active.
+	/// * `soundio::Error::BackendDisconnected` if the backend disconnected while connecting. See also [bug 103](https://github.com/andrewrk/libsoundio/issues/103)
 	///
 	/// # Examples
 	///
@@ -159,7 +211,9 @@ impl Context {
 		}
 	}
 
-	/// Return the current `Backend`, which may be `Backend::None`.
+	/// Return the current `Backend`.
+	///
+	/// If this `Context` isn't connected to any backend it returns `Backend::None`.
 	///
 	/// # Examples
 	///
@@ -193,14 +247,36 @@ impl Context {
 		backends
 	}
 
-	/// Flush events. This must be called before enumerating devices.
+	/// Atomically update information for all connected devices. Note that calling
+	/// this function merely flips a pointer; the actual work of collecting device
+	/// information is done elsewhere. It is performant to call this function many
+	/// times per second.
+	///
+	/// When you call this, the following callbacks might be called:
+	/// * SoundIo::on_devices_change
+	/// * SoundIo::on_backend_disconnect
+	/// This is the only time those callbacks can be called.
+	///
+	/// This must be called from the same thread as the thread in which you call
+	/// these functions:
+	/// * ::soundio_input_device_count
+	/// * ::soundio_output_device_count
+	/// * ::soundio_get_input_device
+	/// * ::soundio_get_output_device
+	/// * ::soundio_default_input_device_index
+	/// * ::soundio_default_output_device_index
+	///
+	/// Note that if you do not care about learning about updated devices, you
+	/// might call this function only once ever and never call
+	/// ::soundio_wait_events.
 	pub fn flush_events(&self) {
 		unsafe {
 			raw::soundio_flush_events(self.soundio);
 		}
 	}
 
-	/// Wait for events. Call this in a loop.
+	/// This function calls `flush_events` then blocks until another event
+	/// is ready or you call `wakeup`. Be ready for spurious wakeups.
 	pub fn wait_events(&self) {
 		unsafe {
 			raw::soundio_wait_events(self.soundio);
@@ -216,6 +292,20 @@ impl Context {
 		}
 	}
 
+	/// If necessary you can manually trigger a device rescan. Normally you will
+	/// not ever have to call this function, as libsoundio listens to system events
+	/// for device changes and responds to them by rescanning devices and preparing
+	/// the new device information for you to be atomically replaced when you call
+	/// ::soundio_flush_events. However you might run into cases where you want to
+	/// force trigger a device rescan, for example if an ALSA device has a
+	/// SoundIoDevice::probe_error.
+	///
+	/// After you call this you still have to use ::soundio_flush_events or
+	/// ::soundio_wait_events and then wait for the
+	/// SoundIo::on_devices_change callback.
+	///
+	/// This can be called from any thread context except for
+	/// SoundIoOutStream::write_callback and SoundIoInStream::read_callback
 	pub fn force_device_scan(&self) {
 		unsafe {
 			raw::soundio_force_device_scan(self.soundio);
@@ -224,10 +314,16 @@ impl Context {
 
 	// Get a device, or None if the index is out of bounds or you never called flush_events()
 	// (you have to call flush_events() before getting devices).
-	pub fn get_input_device(&self, index: usize) -> result::Result<Device, ()> {
+	pub fn get_input_device(&self, index: usize) -> Result<Device> {
 		let device = unsafe { raw::soundio_get_input_device(self.soundio, index as c_int) };
 		if device == ptr::null_mut() {
-			return Err(());
+			return Err(Error::OpeningDevice);
+		}
+
+		let probe_error = unsafe { (*device).probe_error };
+
+		if probe_error != 0 {
+			return Err(probe_error.into());
 		}
 
 		Ok(Device {
@@ -236,10 +332,16 @@ impl Context {
 		})
 	}
 
-	pub fn get_output_device(&self, index: usize) -> result::Result<Device, ()> {
+	pub fn get_output_device(&self, index: usize) -> Result<Device> {
 		let device = unsafe { raw::soundio_get_output_device(self.soundio, index as c_int) };
 		if device == ptr::null_mut() {
-			return Err(());
+			return Err(Error::OpeningDevice);
+		}
+
+		let probe_error = unsafe { (*device).probe_error };
+
+		if probe_error != 0 {
+			return Err(probe_error.into());
 		}
 
 		Ok(Device {
@@ -248,46 +350,42 @@ impl Context {
 		})
 	}
 
-	// TODO: I should use Result, but then just add another error: FlushNotCalled.
-	// Or maybe just panic?
-
-	// Returns Err(()) if you never called flush_events().
-	pub fn input_device_count(&self) -> result::Result<usize, ()> {
+	/// Panics if you never called flush_events().
+	pub fn input_device_count(&self) -> usize {
 		let count = unsafe { raw::soundio_input_device_count(self.soundio) };
-		match count {
-			-1 => Err(()),
-			_ => Ok(count as usize),
-		}
+		assert!(count != -1, "flush_events() must be called before input_device_count()");
+		count as _
 	}
 
-	pub fn output_device_count(&self) -> result::Result<usize, ()> {
+	/// Panics if you never called flush_events().
+	pub fn output_device_count(&self) -> usize {
 		let count = unsafe { raw::soundio_output_device_count(self.soundio) };
-		match count {
-			-1 => Err(()),
-			_ => Ok(count as usize),
-		}
+		assert!(count != -1, "flush_events() must be called before output_device_count()");
+		count as _
 	}
 	
-	// Returns None if you never called flush_events().
-	pub fn default_input_device_index(&self) -> result::Result<usize, ()> {
+	/// Returns None if there are no input devices, or you never called flush_events().
+	pub fn default_input_device_index(&self) -> Option<usize> {
 		let index = unsafe { raw::soundio_default_input_device_index(self.soundio) };
 		match index {
-			-1 => Err(()),
-			_ => Ok(index as usize),
+			-1 => None,
+			_ => Some(index as usize),
 		}
 	}
 
-	pub fn default_output_device_index(&self) -> result::Result<usize, ()> {
+	/// Returns None if there are no input devices, or you never called flush_events().
+	pub fn default_output_device_index(&self) -> Option<usize> {
 		let index = unsafe { raw::soundio_default_output_device_index(self.soundio) };
 		match index {
-			-1 => Err(()),
-			_ => Ok(index as usize),
+			-1 => None,
+			_ => Some(index as usize),
 		}
 	}
 
-	// Get all the input devices. If you never called flush_events() it returns Err(()).
-	pub fn input_devices(&self) -> result::Result<Vec<Device>, ()> {
-		let count = self.input_device_count()?;
+	/// Get all the input devices. Panics if you never called flush_events().
+	/// It returns an error if there is an error opening any of the devices.
+	pub fn input_devices(&self) -> Result<Vec<Device>> {
+		let count = self.input_device_count();
 		let mut devices = Vec::new();
 		for i in 0..count {
 			devices.push(self.get_input_device(i)?);
@@ -295,9 +393,10 @@ impl Context {
 		Ok(devices)
 	}
 
-	// Get all the output devices. If you never called flush_events() it returns Err(()).
-	pub fn output_devices(&self) -> result::Result<Vec<Device>, ()> {
-		let count = self.output_device_count()?;
+	/// Get all the input devices. Panics if you never called flush_events().
+	/// It returns an error if there is an error opening any of the devices.
+	pub fn output_devices(&self) -> Result<Vec<Device>> {
+		let count = self.output_device_count();
 		let mut devices = Vec::new();
 		for i in 0..count {
 			devices.push(self.get_output_device(i)?);
@@ -305,16 +404,24 @@ impl Context {
 		Ok(devices)
 	}
 
-	// Get all the default input device. If you never called flush_events() it returns Err(()).
-	pub fn default_input_device(&self) -> result::Result<Device, ()> {
-		let index = self.default_input_device_index()?;
-		Ok(self.get_input_device(index)?)
+	/// Get all the default input device. If you never called flush_events() it panics.
+	/// If there are no devices it returns Error::NoSuchDevice.
+	pub fn default_input_device(&self) -> Result<Device> {
+		let index = match self.default_input_device_index() {
+			Some(x) => x,
+			None => return Err(Error::NoSuchDevice),
+		};
+		self.get_input_device(index)
 	}
 	
-	// Get all the default output device. If you never called flush_events() it returns Err(()).
-	pub fn default_output_device(&self) -> result::Result<Device, ()> {
-		let index = self.default_output_device_index()?;
-		Ok(self.get_output_device(index)?)
+	/// Get all the default output device. If you never called flush_events() it panics.
+	/// If there are no devices it returns Error::NoSuchDevice.
+	pub fn default_output_device(&self) -> Result<Device> {
+		let index = match self.default_output_device_index() {
+			Some(x) => x,
+			None => return Err(Error::NoSuchDevice),
+		};
+		self.get_output_device(index)
 	}
 }
 
@@ -331,7 +438,6 @@ impl Drop for Context {
 // TODO: Find out exactly the thread-safety properties of libsoundio.
 unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
-
 
 #[cfg(test)]
 mod tests {

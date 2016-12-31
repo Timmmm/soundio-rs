@@ -26,6 +26,10 @@ path = "examples/player/main.rs"
 name = "recorder"
 path = "examples/recorder/main.rs"
 
+[[example]]
+name = "list_devices"
+path = "examples/list_devices/main.rs"
+
 [dev_dependencies]
 crossbeam = "0.2.10"
 hound = "3.0.0"

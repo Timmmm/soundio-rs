@@ -13,6 +13,9 @@ use std::fmt;
 ///
 /// The Backend type supports the `Display` trait, so you can use it in `println!()`.
 ///
+/// The only use for `Backend::None` is that it is returned from `Context::current_backend()`
+/// if the `Context` isn't connected.
+///
 /// # Examples
 ///
 /// ```

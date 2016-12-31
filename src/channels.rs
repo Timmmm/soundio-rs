@@ -4,12 +4,15 @@ use super::util::*;
 
 use std::fmt;
 
-/// ChannelId indicates what kind of channel a channel is (left, right, LFE, etc.).
+/// ChannelId indicates the location or intent of a channel (left, right, LFE, etc.).
+///
+/// It supports the `Display` trait so that you can convert `ChannelId::FrontLeft` to `"Front Left"` for example.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ChannelId {
 	Invalid,
 
-	FrontLeft, // First of the more commonly supported ids.
+	/// The more commonly supported ids.
+	FrontLeft, 
 	FrontRight,
 	FrontCenter,
 	Lfe,
@@ -26,9 +29,10 @@ pub enum ChannelId {
 	TopFrontRight,
 	TopBackLeft,
 	TopBackCenter,
-	TopBackRight, // Last of the more commonly supported ids.
+	TopBackRight,
 
-	BackLeftCenter, // First of the less commonly supported ids.
+	/// The less commonly supported ids.
+	BackLeftCenter, 
 	BackRightCenter,
 	FrontLeftWide,
 	FrontRightWide,
@@ -46,28 +50,29 @@ pub enum ChannelId {
 	BottomLeftCenter,
 	BottomRightCenter,
 
-	// Mid/side recording
+	/// Mid/side recording
 	MsMid,
 	MsSide,
 
-	// first order ambisonic channels
+	/// First order ambisonic channels
 	AmbisonicW,
 	AmbisonicX,
 	AmbisonicY,
 	AmbisonicZ,
 
-	// X-Y Recording
+	/// X-Y Recording
 	XyX,
 	XyY,
 
-	HeadphonesLeft, // First of the "other" channel ids
+	/// The "other" channel ids
+	HeadphonesLeft, 
 	HeadphonesRight,
 	ClickTrack,
 	ForeignLanguage,
 	HearingImpaired,
 	Narration,
 	Haptic,
-	DialogCentricMix, // Last of the "other" channel ids
+	DialogCentricMix,
 
 	Aux,
 	Aux0,
@@ -89,7 +94,7 @@ pub enum ChannelId {
 }
 
 impl From<raw::SoundIoChannelId> for ChannelId {
-    fn from(channel_id: raw::SoundIoChannelId) -> ChannelId {
+	fn from(channel_id: raw::SoundIoChannelId) -> ChannelId {
 		match channel_id {
 			raw::SoundIoChannelId::SoundIoChannelIdFrontLeft => ChannelId::FrontLeft,
 			raw::SoundIoChannelId::SoundIoChannelIdFrontRight => ChannelId::FrontRight,
@@ -161,11 +166,11 @@ impl From<raw::SoundIoChannelId> for ChannelId {
 			raw::SoundIoChannelId::SoundIoChannelIdAux15 => ChannelId::Aux15,
 			_ => ChannelId::Invalid,
 		}
-    }
+	}
 }
 
 impl From<ChannelId> for raw::SoundIoChannelId {
-    fn from(channel_id: ChannelId) -> raw::SoundIoChannelId {
+	fn from(channel_id: ChannelId) -> raw::SoundIoChannelId {
 		match channel_id {
 			ChannelId::FrontLeft => raw::SoundIoChannelId::SoundIoChannelIdFrontLeft,
 			ChannelId::FrontRight => raw::SoundIoChannelId::SoundIoChannelIdFrontRight,
@@ -237,20 +242,36 @@ impl From<ChannelId> for raw::SoundIoChannelId {
 			ChannelId::Aux15 => raw::SoundIoChannelId::SoundIoChannelIdAux15,
 			_ => raw::SoundIoChannelId::SoundIoChannelIdInvalid,
 		}
-    }
+	}
 }
 
 impl fmt::Display for ChannelId {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-       // In the C source these only use ASCII characters so it is technically ambiguous
-        // whether this is UTF-8 or Latin1.
-        let s = latin1_to_string( unsafe { raw::soundio_get_channel_name((*self).into()) } );
+		// In the C source these only use ASCII characters so it is technically ambiguous
+		// whether this is UTF-8 or Latin1.
+		let s = latin1_to_string( unsafe { raw::soundio_get_channel_name((*self).into()) } );
 		f.write_str(&s)
 	}
 }
 
+impl ChannelId {
+	/// Given UTF-8 encoded text which is the name of a channel such as
+	/// "Front Left", "FL", or "front-left", return the corresponding
+	/// `ChannelId`. Returns `None` for no match.
+	pub fn parse(id: &str) -> Option<ChannelId> {
+		match unsafe { raw::soundio_parse_channel_id(id.as_ptr() as _, id.len() as _) } {
+			raw::SoundIoChannelId::SoundIoChannelIdInvalid => None,
+			x => Some(x.into()),
+		}
+	}
+}
+
+
 /// Built-in channel layouts for convenience.
-/// This can be used with `ChannelLayout::get_builtin()`.
+/// These can be used with `ChannelLayout::get_builtin()`.
+///
+/// Some values are prepended with `C` where they started with a digit. For example
+/// `C2Point1` means 2.1 and so on.
 ///
 /// # Examples
 ///
@@ -288,7 +309,7 @@ pub enum ChannelLayoutId {
 }
 
 impl From<raw::SoundIoChannelLayoutId> for ChannelLayoutId {
-    fn from(channel_layout_id: raw::SoundIoChannelLayoutId) -> ChannelLayoutId {
+	fn from(channel_layout_id: raw::SoundIoChannelLayoutId) -> ChannelLayoutId {
 		match channel_layout_id {
 			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutIdMono            => ChannelLayoutId::Mono,
 			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutIdStereo          => ChannelLayoutId::Stereo,
@@ -317,11 +338,11 @@ impl From<raw::SoundIoChannelLayoutId> for ChannelLayoutId {
 			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point1WideBack => ChannelLayoutId::C7Point1WideBack,
 			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutIdOctagonal       => ChannelLayoutId::Octagonal,
 		}
-    }
+	}
 }
 
 impl From<ChannelLayoutId> for raw::SoundIoChannelLayoutId {
-    fn from(channel_layout_id: ChannelLayoutId) -> raw::SoundIoChannelLayoutId {
+	fn from(channel_layout_id: ChannelLayoutId) -> raw::SoundIoChannelLayoutId {
 		match channel_layout_id {
 			ChannelLayoutId::Mono             => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutIdMono,
 			ChannelLayoutId::Stereo           => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutIdStereo,
@@ -350,6 +371,6 @@ impl From<ChannelLayoutId> for raw::SoundIoChannelLayoutId {
 			ChannelLayoutId::C7Point1WideBack => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point1WideBack,
 			ChannelLayoutId::Octagonal        => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutIdOctagonal,
 		}
-    }
+	}
 }
 

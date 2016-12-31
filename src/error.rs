@@ -7,7 +7,16 @@ use std::result;
 
 use std::os::raw::c_int;
 
-
+/// Error is the error return type for many functions. These arena
+/// taken directly from libsoundio. It supports conversion to `String` using
+/// the `From` trait.
+///
+/// # Examples
+///
+/// ```
+/// let e = Error::IncompatibleDevice;
+/// println!("{}", e.description());
+/// ```
 #[derive(Debug, Copy, Clone)]
 pub enum Error {
 	/// Out of memory.
@@ -40,17 +49,13 @@ pub enum Error {
 	Underflow,
 	/// Unable to convert to or from UTF-8 to the native string format.
 	EncodingString,
-
 	/// Unknown error that libsoundio should never return.
 	Unknown,
-
-	// TODO: Add more errors - flush events not called (or should I just panic as that is a programmer error?)
 }
 
 impl From<c_int> for Error {
     fn from(err: c_int) -> Error {
 		match err {
-			// TODO: There must be a better way than this.
 			1 => Error::NoMem,
 			2 => Error::InitAudioBackend,
 			3 => Error::SystemResources,
@@ -74,7 +79,6 @@ impl From<c_int> for Error {
 impl From<Error> for c_int {
 	fn from(err: Error) -> c_int {
 		match err {
-			// TODO: There must be a better way than this.
 			Error::NoMem => 1,
 			Error::InitAudioBackend => 2,
 			Error::SystemResources => 3,
@@ -99,7 +103,6 @@ impl From<Error> for c_int {
 pub type Result<T> = result::Result<T, Error>;
 
 // Implement displaying the error. We just use the description.
-// TODO: There must be a way to automatically #[derive()] this no?
 impl fmt::Display for Error {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		use std::error::Error;
@@ -112,8 +115,8 @@ impl error::Error for Error {
 	fn description(&self) -> &str {
 		let c_str: &CStr = unsafe { CStr::from_ptr(raw::soundio_strerror((*self).into())) };
 
-		// TODO: to_str() checks for valid UTF-8 since that what a &str is. Is it safe to assume
-		// soundio_strerror() never returns invalid UTF-8?
+		// to_str() checks for valid UTF-8 since that what a &str is. For now at least there are
+		// no invalid UTF-8 sequences in the C source.
 		c_str.to_str().unwrap()
 	}
 

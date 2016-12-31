@@ -144,30 +144,25 @@ impl Format {
 	}
 }
 
-// Bit of a hack, but useful!
-macro_rules! format_from_type {
-    ($basic_type:ty, $format_type:path) => (
-        impl From<$basic_type> for Format {
-			fn from(_val: $basic_type) -> Format {
-				$format_type
-    		}
-		}
-	)
+impl fmt::Display for Format {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		let c_str: &CStr = unsafe { CStr::from_ptr(raw::soundio_format_string((*self).into())) };
+
+		// TODO: to_str() checks for valid UTF-8 since that what a &str is. Is it safe to assume
+		// soundio_strerror() never returns invalid UTF-8?
+		
+		f.write_str(c_str.to_str().unwrap())
+	}
 }
 
-// I'm assuming little endian. If you're using big endian I pity you.
-format_from_type!(i8, Format::S8);
-format_from_type!(u8, Format::U8);
-format_from_type!(i16, Format::S16LE);
-format_from_type!(u16, Format::U16LE);
-// TODO: What about i24?
-format_from_type!(i32, Format::S32LE);
-format_from_type!(u32, Format::U32LE);
-format_from_type!(f32, Format::Float32LE);
-format_from_type!(f64, Format::Float64LE);
-
+/// This is a trait for types that can be cast to or from an f64.
+///
+/// It is implemented for all the primitive numeric types: `u8`, `u16`, `u32`, `u64`,
+/// `usize`, `i8`, `i16`, `i32`, `i64`, `isize`, `f32` and `f64`.
 pub trait CastF64 {
+    /// Cast the type from an f64. 
     fn from_f64(v: f64) -> Self;
+    /// Cast the type to an f64.
 	fn to_f64(v: Self) -> f64;
 }
 
@@ -191,13 +186,3 @@ macro_rules! impl_cast_f64 {
 
 impl_cast_f64!(u8 u16 u32 u64 usize i8 i16 i32 i64 isize f32 f64);
 
-impl fmt::Display for Format {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let c_str: &CStr = unsafe { CStr::from_ptr(raw::soundio_format_string((*self).into())) };
-
-		// TODO: to_str() checks for valid UTF-8 since that what a &str is. Is it safe to assume
-		// soundio_strerror() never returns invalid UTF-8?
-		
-		f.write_str(c_str.to_str().unwrap())
-	}
-}
