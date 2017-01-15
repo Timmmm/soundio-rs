@@ -2,6 +2,7 @@ extern crate libsoundio_sys as raw;
 
 use super::error::*;
 use super::format::*;
+use super::util::*;
 
 use std::ptr;
 use std::os::raw::{c_int, c_double};
@@ -200,7 +201,7 @@ impl<'a> OutStream<'a> {
     /// Must not contain a colon (":").
 	pub fn name(&self) -> String {
 		unsafe {
-			utf8_to_string(*self.userdata.outstream).name)
+			utf8_to_string((*self.userdata.outstream).name)
 		}
 	}
 
