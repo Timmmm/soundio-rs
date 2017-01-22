@@ -13,17 +13,19 @@ use std::os::raw::c_int;
 use std::marker::PhantomData;
 use std::slice;
 
-pub struct Device<'a> {
-	pub device: *mut raw::SoundIoDevice,
-
-	// This is just here to say that Device cannot outlive the Context it was created from. 'a is the lifetime of that Context.
-	pub phantom: PhantomData<&'a ()>,
-}
-
 /// Device represents an input or output device.
 ///
 /// It is obtained from a `Context` using `Context::get_input_device()` or `Context::get_output_device()`.
 /// You can use it to open an input stream or output stream. 
+pub struct Device<'a> {
+	/// The raw pointer to the device.
+	pub device: *mut raw::SoundIoDevice,
+
+	/// This is just here to say that Device cannot outlive the Context it was created from.
+	/// 'a is the lifetime of that Context.
+	pub phantom: PhantomData<&'a ()>,
+}
+
 impl<'a> Device<'a> {
 
 	/// A string of bytes that uniquely identifies this device.
