@@ -28,14 +28,16 @@ pub struct Device<'a> {
 
 impl<'a> Device<'a> {
 
-	/// A string of bytes that uniquely identifies this device.
-	/// If the same physical device supports both input and output, that makes
-	/// one SoundIoDevice for the input and one SoundIoDevice for the output.
-	/// In this case, the id of each SoundIoDevice will be the same, and
-	/// SoundIoDevice::aim will be different. Additionally, if the device
-	/// supports raw mode, there may be up to four devices with the same id:
-	/// one for each value of SoundIoDevice::is_raw and one for each value of
-	/// SoundIoDevice::aim.
+	/// A string that uniquely identifies this device.
+	///
+	/// If the same physical device supports both input and output, it is split
+	/// into one `Device` for the input and another for the output. 
+	///
+	/// In this case, the `id` of each `Device` will be the same, and
+	/// `Device::aim()` will be different. Additionally, if the device
+	/// supports raw mode, there may be up to four devices with the same `id`:
+	/// one for each value of `Device::is_raw()` and one for each value of
+	/// `Device::aim()`.
 	pub fn id(&self) -> String {
 		// This is not explicitly latin1 but it is described as 'a string of bytes' so
 		// it may contain invalid UTF-8 sequences.
@@ -49,6 +51,9 @@ impl<'a> Device<'a> {
 	}
 
 	/// Tells whether this device is an input device or an output device.
+	///
+	/// If a physical device supports input and output it is split into two
+	/// `Device`s, with the same `Device::id()` but different `Device::aim()`s.
 	pub fn aim(&self) -> DeviceAim {
 		unsafe {
 			(*self.device).aim.into()
