@@ -7,7 +7,7 @@ use std::result;
 
 use std::os::raw::c_int;
 
-/// Error is the error return type for many functions. These arena
+/// Error is the error return type for many functions. These are
 /// taken directly from libsoundio. It supports conversion to `String` using
 /// the `From` trait.
 ///
@@ -99,7 +99,7 @@ impl From<Error> for c_int {
 	}
 }
 
-// Local typedef for results that we return.
+/// Local typedef for results that soundio-rs returns.
 pub type Result<T> = result::Result<T, Error>;
 
 // Implement displaying the error. We just use the description.
