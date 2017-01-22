@@ -39,7 +39,9 @@ impl From<raw::SoundIoChannelLayout> for ChannelLayout {
 impl From<ChannelLayout> for raw::SoundIoChannelLayout {
     fn from(layout: ChannelLayout) -> raw::SoundIoChannelLayout {
 		raw::SoundIoChannelLayout {
-			name: ptr::null(), // TODO: Allow the name to be set somehow? Do I need to?
+			// As far as I can tell there is no need to be able to set the name,
+			// and doing so would be rather complicated.
+			name: ptr::null(),
 			channel_count: layout.channels.len() as c_int,
 			channels: {
 				let mut c = [raw::SoundIoChannelId::SoundIoChannelIdInvalid; raw::SOUNDIO_MAX_CHANNELS];
@@ -54,6 +56,13 @@ impl From<ChannelLayout> for raw::SoundIoChannelLayout {
 
 impl ChannelLayout {
 	/// Get all of the built-in layouts.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let builtins = ChannelLayout::get_all_builtin();
+	/// println!("{?:}", builtins);
+	/// ```
 	pub fn get_all_builtin() -> Vec<ChannelLayout> {
 		let count = unsafe { raw::soundio_channel_layout_builtin_count() };
 		let mut layouts = Vec::new();
@@ -63,7 +72,15 @@ impl ChannelLayout {
 		layouts
 	}
 
-	/// Get a specific built-in layout.
+	/// Get a specific built-in layout. See `ChannelLayoutId` for a list
+	/// of built-in layouts.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let stereo_layout = ChannelLayout::get_builtin(ChannelLayoutId::Stereo);
+	/// assert_eq!(stereo_layout.channels.len(), 2);
+	/// ```
 	pub fn get_builtin(id: ChannelLayoutId) -> ChannelLayout {
 		unsafe {
 			(*raw::soundio_channel_layout_get_builtin(
@@ -73,6 +90,13 @@ impl ChannelLayout {
 	}
 
 	/// Get the default layout for the given number of channels.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let default_stereo = ChannelLayout::get_default(2);
+	/// assert_eq!(default_stereo.name, "Stereo".to_string());
+	/// ```
 	pub fn get_default(channel_count: i32) -> ChannelLayout {
 		unsafe {
 			(*raw::soundio_channel_layout_get_default(channel_count as c_int)).into()
@@ -82,6 +106,23 @@ impl ChannelLayout {
 	/// Iterates over preferred_layouts. Returns the first channel layout in
 	/// preferred_layouts which matches (using ==) one of the channel layouts in
 	/// available_layouts. Returns None if none matches.
+	///
+	/// # Examples
+	///
+	/// ```rust,ignore
+	/// let my_device: Device = ...;
+	/// let preferred_layouts = vec![ChannelLayout::get_builtin(ChannelLayoutId::Stereo),
+	///                              ChannelLayout::get_builtin(ChannelLayoutId::Mono)];
+	///
+	/// let available_layouts = my_device.layouts();
+	///
+	/// let best_layout = ChannelLayout::best_matching_channel_layout(preferred_layouts, available_layouts);
+	///
+	/// if best_layout == None {
+	///     panic!("Stereo and mono not available! What *is* this device??");
+	/// }
+	/// let Some(best_layout) = best_layout;
+	/// ```
 	pub fn best_matching_channel_layout(preferred_layouts: &Vec<ChannelLayout>, available_layouts: &Vec<ChannelLayout>) -> Option<ChannelLayout> {
 		for preferred_layout in preferred_layouts {
 			if available_layouts.contains(preferred_layout) {
@@ -92,6 +133,17 @@ impl ChannelLayout {
 	}
 
 	/// Find the given channel in a layout and return its index, or `None` if it wasn't found.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let layout = ChannelLayout::get_builtin(ChannelLayoutId::Stereo);
+	/// let left_idx = layout.find_channel(ChannelId::Left);
+	/// let center_idx = layout.find_channel(ChannelId::Center);
+	///
+	/// assert_eq!(left_idx, Some(0));
+	/// assert_eq!(center_idx, None);
+	/// ```
 	pub fn find_channel(&self, channel: ChannelId) -> Option<usize> {
 		// There is a C function for this but it seems simpler and safer to do it in Rust.
 		self.channels.iter().position(|&c| c == channel)
@@ -99,6 +151,18 @@ impl ChannelLayout {
 
 	/// Populate the name field with the built-in name if this layout matches one of the built-in layouts.
 	/// Returns `true` if it did.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let layout = ChannelLayout {
+	///     name: "".to_string(),
+	///     channels: vec![ChannelId::Left, ChannelId::Right],
+	/// };
+	/// 
+	/// assert_eq!(layout.detect_builtin(), true);
+	/// assert_eq!(layout.name, "Stereo".to_string());
+	/// ```
 	pub fn detect_builtin(&mut self) -> bool {
 		let mut raw_layout = raw::SoundIoChannelLayout::from(self.clone());
 
@@ -111,6 +175,18 @@ impl ChannelLayout {
 
 	/// Sort a set of `ChannelLayouts` by channel count, descending. The content of the channels
 	/// and the layout name are ignored; only the number of channels is significant.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let mut layouts = ChannelLayout::get_all_builtin();
+	/// 
+	/// ChannelLayout::sort(&mut layouts);
+	/// 
+	/// for i in 0..layouts.len()-1 {
+	///     assert!(layouts[i+1].channels.len() >= layouts[i].channels.len());
+	/// }
+	/// ```
 	pub fn sort(layouts: &mut [ChannelLayout]) {
 		// This is easier to do in Rust. It literally sorts by channel count.
 		layouts.sort_by(|a, b| a.channels.len().cmp(&b.channels.len()));
@@ -119,6 +195,21 @@ impl ChannelLayout {
 
 /// Equality testing for layouts. The channels must be the same
 /// IDs and in the same order. The layout name is ignored.
+///
+/// # Examples
+///
+/// ```
+/// let layout_a = ChannelLayout {
+///     name: "unimportant".to_string(),
+///     channels: vec![ChannelId::Left, ChannelId::Right],
+/// };
+/// let layout_b = ChannelLayout {
+///     name: "doesn't matter".to_string(),
+///     channels: vec![ChannelId::Left, ChannelId::Right],
+/// };
+///
+/// assert_eq!(layout_a, layout_b);
+/// ```
 impl PartialEq for ChannelLayout {
     fn eq(&self, other: &ChannelLayout) -> bool {
         self.channels == other.channels
