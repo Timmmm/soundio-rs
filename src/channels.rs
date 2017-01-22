@@ -7,6 +7,14 @@ use std::fmt;
 /// ChannelId indicates the location or intent of a channel (left, right, LFE, etc.).
 ///
 /// It supports the `Display` trait so that you can convert `ChannelId::FrontLeft` to `"Front Left"` for example.
+///
+/// # Examples
+///
+/// ```
+/// println!("Layout: {}", ChannelId::FrontLeftCenter);
+///
+/// assert_eq!(format!("{}", ChannelId::MsMid), ""Mid/Side Mid");
+/// ```
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ChannelId {
 	Invalid,
@@ -258,6 +266,15 @@ impl ChannelId {
 	/// Given UTF-8 encoded text which is the name of a channel such as
 	/// "Front Left", "FL", or "front-left", return the corresponding
 	/// `ChannelId`. Returns `None` for no match.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// assert_eq!(ChannelId::parse("Front Left Center"), Some(ChannelId::FrontLeftCenter));
+	/// assert_eq!(ChannelId::parse("FLC"), Some(ChannelId::FrontLeftCenter));
+	/// assert_eq!(ChannelId::parse("front-left-of-center"), Some(ChannelId::FrontLeftCenter));
+	/// assert_eq!(ChannelId::parse("Shot is the best!"), None));
+	/// ```
 	pub fn parse(id: &str) -> Option<ChannelId> {
 		match unsafe { raw::soundio_parse_channel_id(id.as_ptr() as _, id.len() as _) } {
 			raw::SoundIoChannelId::SoundIoChannelIdInvalid => None,
