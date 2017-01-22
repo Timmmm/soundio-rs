@@ -46,7 +46,85 @@ pub enum Format {
 	Float64BE,
 }
 
-// TODO: Add functions / constants for native / foreign endian. 
+// TODO: Document these better and add examples. Check it works. Also there's probably a better way.
+
+#[cfg(target_endian = "big")]
+#[allow(non_upper_case_globals)]
+pub mod native {
+	use super::Format;
+
+	/// Signed 16 bit Foreign Endian
+	pub const S16FE: Format = Format::S16LE;
+	/// Signed 16 bit Native Endian
+	pub const S16NE: Format = Format::S16BE;
+	/// Unsigned 16 bit Foreign Endian
+	pub const U16FE: Format = Format::U16LE;
+	/// Unsigned 16 bit Native Endian
+	pub const U16NE: Format = Format::U16BE;
+	/// Signed 24 bit Foreign Endian using low three bytes in 32-bit word
+	pub const S24FE: Format = Format::S24LE;
+	/// Signed 24 bit Native Endian using low three bytes in 32-bit word
+	pub const S24NE: Format = Format::S24BE;
+	/// Unsigned 24 bit Foreign Endian using low three bytes in 32-bit word
+	pub const U24FE: Format = Format::U24LE;
+	/// Unsigned 24 bit Native Endian using low three bytes in 32-bit word
+	pub const U24NE: Format = Format::U24BE;
+	/// Signed 32 bit Foreign Endian
+	pub const S32FE: Format = Format::S32LE;
+	/// Signed 32 bit Native Endian
+	pub const S32NE: Format = Format::S32BE;
+	/// Unsigned 32 bit Foreign Endian
+	pub const U32FE: Format = Format::U32LE;
+	/// Unsigned 32 bit Native Endian
+	pub const U32NE: Format = Format::U32BE;
+	/// Float 32 bit Foreign Endian, Range -1.0 to 1.0
+	pub const Float32FE: Format = Format::Float32LE;
+	/// Float 32 bit Native Endian, Range -1.0 to 1.0
+	pub const Float32NE: Format = Format::Float32BE;
+	/// Float 64 bit Foreign Endian, Range -1.0 to 1.0
+	pub const Float64FE: Format = Format::Float64LE;
+	/// Float 64 bit Native Endian, Range -1.0 to 1.0
+	pub const Float64NE: Format = Format::Float64BE;
+}
+
+#[cfg(target_endian = "little")]
+#[allow(non_upper_case_globals)]
+pub mod native {
+	use super::Format;
+
+	/// Signed 16 bit Native Endian
+	pub const S16NE: Format = Format::S16LE;
+	/// Signed 16 bit Foreign Endian
+	pub const S16FE: Format = Format::S16BE;
+	/// Unsigned 16 bit Native Endian
+	pub const U16NE: Format = Format::U16LE;
+	/// Unsigned 16 bit Foreign Endian
+	pub const U16FE: Format = Format::U16BE;
+	/// Signed 24 bit Native Endian using low three bytes in 32-bit word
+	pub const S24NE: Format = Format::S24LE;
+	/// Signed 24 bit Foreign Endian using low three bytes in 32-bit word
+	pub const S24FE: Format = Format::S24BE;
+	/// Unsigned 24 bit Native Endian using low three bytes in 32-bit word
+	pub const U24NE: Format = Format::U24LE;
+	/// Unsigned 24 bit Foreign Endian using low three bytes in 32-bit word
+	pub const U24FE: Format = Format::U24BE;
+	/// Signed 32 bit Native Endian
+	pub const S32NE: Format = Format::S32LE;
+	/// Signed 32 bit Foreign Endian
+	pub const S32FE: Format = Format::S32BE;
+	/// Unsigned 32 bit Native Endian
+	pub const U32NE: Format = Format::U32LE;
+	/// Unsigned 32 bit Foreign Endian
+	pub const U32FE: Format = Format::U32BE;
+	/// Float 32 bit Native Endian, Range -1.0 to 1.0
+	pub const Float32NE: Format = Format::Float32LE;
+	/// Float 32 bit Foreign Endian, Range -1.0 to 1.0
+	pub const Float32FE: Format = Format::Float32BE;
+	/// Float 64 bit Native Endian, Range -1.0 to 1.0
+	pub const Float64NE: Format = Format::Float64LE;
+	/// Float 64 bit Foreign Endian, Range -1.0 to 1.0
+	pub const Float64FE: Format = Format::Float64BE;
+}
 
 impl From<raw::SoundIoFormat> for Format {
 	fn from(format: raw::SoundIoFormat) -> Format {
