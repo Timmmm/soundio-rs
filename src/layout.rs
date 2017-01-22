@@ -125,3 +125,112 @@ impl PartialEq for ChannelLayout {
     }
 }
 impl Eq for ChannelLayout {}
+
+
+/// Built-in channel layouts for convenience.
+/// These can be used with `ChannelLayout::get_builtin()`.
+///
+/// Some values are prepended with `C` where they started with a digit. For example
+/// `C2Point1` means 2.1 and so on.
+///
+/// # Examples
+///
+/// ```
+/// println!("Stereo Layout: {:?}", soundio::ChannelLayout::get_builtin(soundio::ChannelLayoutId::Stereo));
+/// ```
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum ChannelLayoutId {
+	Mono,
+	Stereo,
+	C2Point1, // Ignore the 'C'. It's just there because it can't start with a number.
+	C3Point0,
+	C3Point0Back,
+	C3Point1,
+	C4Point0,
+	Quad,
+	QuadSide,
+	C4Point1,
+	C5Point0Back,
+	C5Point0Side,
+	C5Point1,
+	C5Point1Back,
+	C6Point0Side,
+	C6Point0Front,
+	Hexagonal,
+	C6Point1,
+	C6Point1Back,
+	C6Point1Front,
+	C7Point0,
+	C7Point0Front,
+	C7Point1,
+	C7Point1Wide,
+	C7Point1WideBack,
+	Octagonal,
+}
+
+impl From<raw::SoundIoChannelLayoutId> for ChannelLayoutId {
+	fn from(channel_layout_id: raw::SoundIoChannelLayoutId) -> ChannelLayoutId {
+		match channel_layout_id {
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutIdMono            => ChannelLayoutId::Mono,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutIdStereo          => ChannelLayoutId::Stereo,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId2Point1         => ChannelLayoutId::C2Point1,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId3Point0         => ChannelLayoutId::C3Point0,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId3Point0Back     => ChannelLayoutId::C3Point0Back,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId3Point1         => ChannelLayoutId::C3Point1,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId4Point0         => ChannelLayoutId::C4Point0,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutIdQuad            => ChannelLayoutId::Quad,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutIdQuadSide        => ChannelLayoutId::QuadSide,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId4Point1         => ChannelLayoutId::C4Point1,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId5Point0Back     => ChannelLayoutId::C5Point0Back,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId5Point0Side     => ChannelLayoutId::C5Point0Side,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId5Point1         => ChannelLayoutId::C5Point1,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId5Point1Back     => ChannelLayoutId::C5Point1Back,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point0Side     => ChannelLayoutId::C6Point0Side,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point0Front    => ChannelLayoutId::C6Point0Front,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutIdHexagonal       => ChannelLayoutId::Hexagonal,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point1         => ChannelLayoutId::C6Point1,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point1Back     => ChannelLayoutId::C6Point1Back,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point1Front    => ChannelLayoutId::C6Point1Front,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point0         => ChannelLayoutId::C7Point0,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point0Front    => ChannelLayoutId::C7Point0Front,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point1         => ChannelLayoutId::C7Point1,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point1Wide     => ChannelLayoutId::C7Point1Wide,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point1WideBack => ChannelLayoutId::C7Point1WideBack,
+			raw::SoundIoChannelLayoutId::SoundIoChannelLayoutIdOctagonal       => ChannelLayoutId::Octagonal,
+		}
+	}
+}
+
+impl From<ChannelLayoutId> for raw::SoundIoChannelLayoutId {
+	fn from(channel_layout_id: ChannelLayoutId) -> raw::SoundIoChannelLayoutId {
+		match channel_layout_id {
+			ChannelLayoutId::Mono             => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutIdMono,
+			ChannelLayoutId::Stereo           => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutIdStereo,
+			ChannelLayoutId::C2Point1         => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId2Point1,
+			ChannelLayoutId::C3Point0         => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId3Point0,
+			ChannelLayoutId::C3Point0Back     => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId3Point0Back,
+			ChannelLayoutId::C3Point1         => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId3Point1,
+			ChannelLayoutId::C4Point0         => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId4Point0,
+			ChannelLayoutId::Quad             => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutIdQuad,
+			ChannelLayoutId::QuadSide         => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutIdQuadSide,
+			ChannelLayoutId::C4Point1         => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId4Point1,
+			ChannelLayoutId::C5Point0Back     => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId5Point0Back,
+			ChannelLayoutId::C5Point0Side     => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId5Point0Side,
+			ChannelLayoutId::C5Point1         => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId5Point1,
+			ChannelLayoutId::C5Point1Back     => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId5Point1Back,
+			ChannelLayoutId::C6Point0Side     => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point0Side,
+			ChannelLayoutId::C6Point0Front    => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point0Front,
+			ChannelLayoutId::Hexagonal        => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutIdHexagonal,
+			ChannelLayoutId::C6Point1         => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point1,
+			ChannelLayoutId::C6Point1Back     => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point1Back,
+			ChannelLayoutId::C6Point1Front    => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId6Point1Front,
+			ChannelLayoutId::C7Point0         => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point0,
+			ChannelLayoutId::C7Point0Front    => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point0Front,
+			ChannelLayoutId::C7Point1         => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point1,
+			ChannelLayoutId::C7Point1Wide     => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point1Wide,
+			ChannelLayoutId::C7Point1WideBack => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutId7Point1WideBack,
+			ChannelLayoutId::Octagonal        => raw::SoundIoChannelLayoutId::SoundIoChannelLayoutIdOctagonal,
+		}
+	}
+}
+
