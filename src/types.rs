@@ -1,9 +1,15 @@
 extern crate libsoundio_sys as raw;
 
+/// Used to identify devices as input or output. In this library
+/// all devices are either input or output. If a physical device supports
+/// both it is exposed as two devices with the same id, but with different
+/// aims returned by `Device::aim()`.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum DeviceAim {
-	Input,  // capture / recording
-	Output, // playback
+	/// Capture / recording
+	Input, 
+	/// Playback 
+	Output,
 }
 
 impl From<raw::SoundIoDeviceAim> for DeviceAim {
@@ -49,8 +55,6 @@ impl From<SampleRateRange> for raw::SoundIoSampleRateRange {
 		}
 	}
 }
-
-
 
 /// This is used for reporting software latency, that is the latency not including
 /// latency due to hardware. It is returned by `Device::software_latency()`.
