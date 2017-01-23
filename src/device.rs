@@ -54,17 +54,33 @@ impl<'a> Device<'a> {
 	///
 	/// If a physical device supports input and output it is split into two
 	/// `Device`s, with the same `Device::id()` but different `Device::aim()`s.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = Context::new();
+	/// ctx.connect_backend(Backend::Dummy).unwrap();
+	/// for dev in ctx.input_devices() {
+	///     assert_eq!(dev.aim(), DeviceAim::Input);
+	/// }
+	/// for dev in ctx.output_devices() {
+	///     assert_eq!(dev.aim(), DeviceAim::Output);
+	/// }
+	/// ```
 	pub fn aim(&self) -> DeviceAim {
 		unsafe {
 			(*self.device).aim.into()
 		}
 	}
 
-	/// Channel layouts are handled similarly to SoundIoDevice::formats.
-	/// If this information is missing due to a SoundIoDevice::probe_error,
-	/// layouts will be NULL. It's OK to modify this data, for example calling
-	/// ::soundio_sort_channel_layouts on it.
+	/// Returns the list of channel layouts supported by this device.
+	/// A channel layout has a name, and a list of channels with a channel ID.
+	/// For examples `ChannelLayout { name: "Stereo", channels: vec![ChannelId::Left, ChannelId::Right] }`.
+	///
 	/// Devices are guaranteed to have at least 1 channel layout.
+	///
+	/// If you call `sort_channel_layouts()` before this function, the layouts will
+	/// be sorted by the number of channels in decreasing order.
 	pub fn layouts(&self) -> Vec<ChannelLayout> {
 
 		let layouts_slice = unsafe {
@@ -74,13 +90,16 @@ impl<'a> Device<'a> {
 		layouts_slice.iter().map(|&x| x.into()).collect()
 	}
 
+	/// 
 	/// See SoundIoDevice::current_format apparently?
+	// TODO: Write docs & examples.
 	pub fn current_layout(&self) -> ChannelLayout {
 		unsafe { (*self.device).current_layout.into() }
 	}
 
 	/// List of formats this device supports. See also
 	/// SoundIoDevice::current_format.
+	// TODO: Write docs & examples.
 	pub fn formats(&self) -> Vec<Format> {
 
 		let formats_slice = unsafe {
@@ -90,34 +109,44 @@ impl<'a> Device<'a> {
 		formats_slice.iter().map(|&x| x.into()).collect()
 	}
 
+	/// Get the current format.
+	///
 	/// A device is either a raw device or it is a virtual device that is
 	/// provided by a software mixing service such as dmix or PulseAudio (see
-	/// SoundIoDevice::is_raw). If it is a raw device,
-	/// current_format is meaningless;
+	/// `Device::is_raw()`). If it is a raw device, `current_format()` is meaningless;
 	/// the device has no current format until you open it. On the other hand,
-	/// if it is a virtual device, current_format describes the
+	/// if it is a virtual device, `current_format()` describes the
 	/// destination sample format that your audio will be converted to. Or,
 	/// if you're the lucky first application to open the device, you might
-	/// cause the current_format to change to your format.
-	/// Generally, you want to ignore current_format and use
-	/// whatever format is most convenient
-	/// for you which is supported by the device, because when you are the only
-	/// application left, the mixer might decide to switch
-	/// current_format to yours. You can learn the supported formats via
-	/// formats and SoundIoDevice::format_count. If this information is missing
-	/// due to a probe error, formats will be `NULL`. If current_format is
-	/// unavailable, it will be set to #SoundIoFormatInvalid.
+	/// cause the `current_format()` to change to your format.
+	/// Generally, you want to ignore `current_format()` and use
+	/// whatever format is most convenient for you which is supported by the device,
+	/// because when you are the only application left, the mixer might decide to switch
+	/// `current_format()` to yours. You can learn the supported formats via
+	/// `Device::formats()`.
+	///
+	/// If `current_format()` is unavailable, it will be set to `Format::Invalid`.
+	///
 	/// Devices are guaranteed to have at least 1 format available.
 	pub fn current_format(&self) -> Format {
 		unsafe { (*self.device).current_format.into() }
 	}
 
-	/// Sample rate is the number of frames per second.
-	/// Sample rate is handled very similar to SoundIoDevice::formats.
-	/// If sample rate information is missing due to a probe error, the field
-	/// will be set to NULL.
-	/// Devices which have SoundIoDevice::probe_error set to #SoundIoErrorNone are
-	/// guaranteed to have at least 1 sample rate available.
+	/// Sample rate is the number of frames per second (a frame is one sample from all channels).
+	/// Sample rate is handled very similar to `formats()`.
+	///
+	/// Devices are guaranteed to have at least 1 sample rate available.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = Context::new();
+	/// ctx.connect_backend(Backend::Dummy).unwrap();
+	/// let out_dev = ctx.default_output_device();
+	/// for rate in out_dev.sample_rates() {
+	///     println!("Sample rate min: {} max {}", rate.min, rate.max);
+	/// }
+	/// ```
 	pub fn sample_rates(&self) -> Vec<SampleRateRange> {
 
 		let sample_rates_slice = unsafe {
@@ -127,16 +156,22 @@ impl<'a> Device<'a> {
 		sample_rates_slice.iter().map(|&x| x.into()).collect()
 	}
 
-	/// See SoundIoDevice::current_format
-	/// 0 if sample rate information is missing due to a probe error.
+	/// Get the current sample rate. This behaves similarly to the current format
+	/// - this value is only meaningful for raw devices that have a sample
+	/// rate defined before a stream is opened. See `Device::current_format()` for
+	/// more information.
+	///
+	/// If `current_sample_rate()` is unavailable it will return 0.
+	///
+	/// Devices are guaranteed to have at least 1 sample rate available.
 	pub fn current_sample_rate(&self) -> i32 {
 		unsafe { (*self.device).sample_rate_current as _ }
 	}
 
-    /// Software latency (current, minimum, maximum) in seconds. If this value is unknown or
-    /// irrelevant, it is set to 0.0.
-    /// For PulseAudio and WASAPI this value is unknown until you open a
-    /// stream.
+	/// Software latency (current, minimum, maximum) in seconds. If this value is unknown or
+	/// irrelevant, it is set to 0.0.
+	///
+	/// For PulseAudio and WASAPI this value is unknown until you open a stream.
 	pub fn software_latency(&self) -> SoftwareLatency {
 		unsafe {
 			SoftwareLatency {
@@ -147,27 +182,40 @@ impl<'a> Device<'a> {
 		}
 	}
 
+	/// Return whether the device has raw access.
+	///
 	/// Raw means that you are directly opening the hardware device and not
 	/// going through a proxy such as dmix, PulseAudio, or JACK. When you open a
 	/// raw device, other applications on the computer are not able to
 	/// simultaneously access the device. Raw devices do not perform automatic
 	/// resampling and thus tend to have fewer formats available.
+	///
+	/// Physical devices will often have a raw `Device` and a virtual one. If the
+	/// device supports input and output you will get four `Device`s.
 	pub fn is_raw(&self) -> bool {
 		unsafe {
 			(*self.device).is_raw != 0
 		}
 	}
 
-	// TODO: probe_error?
-
 	/// Sorts the channels returned by `layouts()` by channel count, descending.
-	pub fn sort_channel_layouts(&self) {
+	pub fn sort_channel_layouts(&mut self) {
+		// It may be a good idea to remove this function. I don't think it adds to the API.
 		unsafe {
 			raw::soundio_device_sort_channel_layouts(self.device);
 		}
 	}
 
 	/// Returns whether or not a given sample `Format` is supported by this device.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = Context::new();
+	/// ctx.connect_backend(Backend::Dummy).unwrap();
+	/// let out_dev = ctx.default_output_device();
+	/// println!("Default output device {} unsigned 16 bit little endian", if out_dev.supports_format(Format::S16LE) { "supports" } else { "doesn't support" });
+	/// ```
 	pub fn supports_format(&self, format: Format) -> bool {
 		unsafe {
 			raw::soundio_device_supports_format(self.device, format.into()) != 0
@@ -175,14 +223,31 @@ impl<'a> Device<'a> {
 	}
 
 	/// Returns whether or not a given channel layout is supported by this device.
+	/// 
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = Context::new();
+	/// ctx.connect_backend(Backend::Dummy).unwrap();
+	/// let out_dev = ctx.default_output_device();
+	/// println!("Default output device {} stereo", if out_dev.supports_layout(ChannelLayout::get_builtin(ChannelLayoutId::Stereo)) { "supports" } else { "doesn't support" });
+	/// ```
 	pub fn supports_layout(&mut self, layout: ChannelLayout) -> bool {
 		unsafe {
-			// TODO: Check this cast is ok.
 			raw::soundio_device_supports_layout(self.device, &layout.into() as *const _) != 0
 		}
 	}
 
 	/// Returns true if the given sample rate is supported by this device.
+	/// 
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = Context::new();
+	/// ctx.connect_backend(Backend::Dummy).unwrap();
+	/// let out_dev = ctx.default_output_device();
+	/// println!("Default output device {} 44.1 kHz", if out_dev.supports_sample_rate(44100) { "supports" } else { "doesn't support" });
+	/// ```
 	pub fn supports_sample_rate(&self, sample_rate: i32) -> bool {
 		unsafe {
 			raw::soundio_device_supports_sample_rate(self.device, sample_rate as c_int) != 0
@@ -191,6 +256,15 @@ impl<'a> Device<'a> {
 
 	/// Returns the nearest supported sample rate of this device. Devices are guaranteed
 	/// to support at least one sample rate.
+	/// 
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = Context::new();
+	/// ctx.connect_backend(Backend::Dummy).unwrap();
+	/// let out_dev = ctx.default_output_device();
+	/// println!("Nearest sample rate to 44000: {}", out_dev.nearest_sample_rate(44000));
+	/// ```
 	pub fn nearest_sample_rate(&self, sample_rate: i32) -> i32 {
 		unsafe {
 			raw::soundio_device_nearest_sample_rate(self.device, sample_rate as c_int) as i32
@@ -205,24 +279,43 @@ impl<'a> Device<'a> {
 	/// If this function returns an error, the outstream is in an invalid state and
 	/// you must call ::soundio_outstream_destroy on it.
 	///
-	/// Possible errors:
-	/// * #SoundIoErrorInvalid
-	///   * SoundIoDevice::aim is not #SoundIoDeviceAimOutput
-	///   * SoundIoOutStream::format is not valid
-	///   * SoundIoOutStream::channel_count is greater than #SOUNDIO_MAX_CHANNELS
-	/// * #SoundIoErrorNoMem
-	/// * #SoundIoErrorOpeningDevice
-	/// * #SoundIoErrorBackendDisconnected
-	/// * #SoundIoErrorSystemResources
-	/// * #SoundIoErrorNoSuchClient - when JACK returns `JackNoSuchClient`
-	/// * #SoundIoErrorIncompatibleBackend - SoundIoOutStream::channel_count is
-	///   greater than the number of channels the backend can handle.
-	/// * #SoundIoErrorIncompatibleDevice - stream parameters requested are not
-	///   compatible with the chosen device.
 
-	// 'a is the lifetime of the Device. The OutStream lifetime 'b must be less than or equal to 'a (indicated by `'b: 'a`).
-	// Also the callbacks must have a lifetime greate than or equal to 'b.
-	// The callbacks only need to have the lifetime
+
+	/// Open an output stream on an output device. After opening you can start, pause and stop it
+	/// using the functions on the `OutStream` that is returned. Then your write callback
+	/// will be called. See the documentation on `OutStreamWriter` for more information.
+	///
+	/// The parameters are as follows.
+	///
+	/// * `sample_rate` - The requested sample rate. Check supported sample rates first with `Device::sample_rates()`.
+	/// * `format` - The requested format. Check supported formats first with `Device::formats()`.
+	/// * `layout` - The requested channel layout. Check supported formats first with `Device::layouts()`.
+	/// * `latency` - The requested software latency in seconds. With a lower value your write callback will be called more often and work in smaller blocks but latency will be lower.
+	/// * `write_callback` - Required callback that is called to allow you to write audio data to the outstream.
+	/// * `underflow_callback` - Optional callback that is called when your `write_callback` is too slow and the output skips.
+	/// * `error_callback` - Optional error callback.
+	///
+	/// # Return Values
+	///
+	/// If successful the function returns an `OutStream` which you can call `OutStream::start()` on,
+	/// otherwise it returns one of the following errors:
+	///
+	/// * `Error::Invalid`
+	///   - `aim()` is not `DeviceAim::Output`
+	///   - `format` is not valid
+	///   - `channel_count` is greater than `SOUNDIO_MAX_CHANNELS` (24).
+	/// * `Error::NoMem`
+	/// * `Error::OpeningDevice`
+	/// * `Error::BackendDisconnected`
+	/// * `Error::SystemResources`
+	/// * `Error::NoSuchClient` - when JACK returns `JackNoSuchClient`
+	/// * `Error::IncompatibleBackend` - `OutStream::channel_count()` is greater than the number of channels the backend can handle.
+	/// * `Error::IncompatibleDevice` - stream parameters requested are not compatible with the chosen device.
+	///
+	/// # Lifetimes
+	///
+	/// `'a` is the lifetime of the `Device`. The `OutStream` lifetime `'b` must be less than or equal to `'a` (indicated by `'b: 'a`).
+	/// Also the callbacks must have a lifetime greater than or equal to `'b`. They do not need to be `'static`.
 	pub fn open_outstream<'b: 'a, WriteCB, UnderflowCB, ErrorCB>(
 				&'a self,
 				sample_rate: i32,
@@ -294,9 +387,41 @@ impl<'a> Device<'a> {
 	}
 
 
-	// 'a is the lifetime of the Device. The InStream lifetime 'b must be less than or equal to 'a (indicated by `'b: 'a`).
-	// Also the callbacks must have a lifetime greate than or equal to 'b.
-	// The callbacks only need to have the lifetime
+	/// Open an input stream on an input device. After opening you can start, pause and stop it
+	/// using the functions on the `InStream` that is returned. Then your read callback
+	/// will be called. See the documentation on `InStreamReader` for more information.
+	///
+	/// The parameters are as follows.
+	///
+	/// * `sample_rate` - The requested sample rate. Check supported sample rates first with `Device::sample_rates()`.
+	/// * `format` - The requested format. Check supported formats first with `Device::formats()`.
+	/// * `layout` - The requested channel layout. Check supported formats first with `Device::layouts()`.
+	/// * `latency` - The requested software latency in seconds. With a lower value your read callback will be called more often and work in smaller blocks but latency will be lower.
+	/// * `read_callback` - Required callback that is called to allow you to process audio data from the instream.
+	/// * `overflow_callback` - Optional callback that is called when your `read_callback` is too slow and skips some input.
+	/// * `error_callback` - Optional error callback.
+	///
+	/// # Return Values
+	///
+	/// If successful the function returns an `InStream` which you can call `InStream::start()` on,
+	/// otherwise it returns one of the following errors:
+	///
+	/// * `Error::Invalid`
+	///   - `aim()` is not `DeviceAim::Input`
+	///   - `format` is not valid
+	///   - `channel_count` is greater than `SOUNDIO_MAX_CHANNELS` (24).
+	/// * `Error::NoMem`
+	/// * `Error::OpeningDevice`
+	/// * `Error::BackendDisconnected`
+	/// * `Error::SystemResources`
+	/// * `Error::NoSuchClient` - when JACK returns `JackNoSuchClient`
+	/// * `Error::IncompatibleBackend` - `OutStream::channel_count()` is greater than the number of channels the backend can handle.
+	/// * `Error::IncompatibleDevice` - stream parameters requested are not compatible with the chosen device.
+	///
+	/// # Lifetimes
+	///
+	/// `'a` is the lifetime of the `Device`. The `InStream` lifetime `'b` must be less than or equal to `'a` (indicated by `'b: 'a`).
+	/// Also the callbacks must have a lifetime greater than or equal to `'b`. They do not need to be `'static`.
 	pub fn open_instream<'b: 'a, ReadCB, OverflowCB, ErrorCB>(
 				&'a self,
 				sample_rate: i32,
@@ -327,6 +452,9 @@ impl<'a> Device<'a> {
 			(*instream).read_callback = instream_read_callback as *mut _;
 			(*instream).overflow_callback = instream_overflow_callback as *mut _;
 			(*instream).error_callback = instream_error_callback as *mut _;
+
+			// TODO: Allow setting (*instream).name
+			// TODO: Allow setting (*instream).non_terminal_hint
 		}
 
 		let mut stream = InStream {
