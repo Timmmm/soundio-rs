@@ -42,10 +42,12 @@ impl From<ChannelLayout> for raw::SoundIoChannelLayout {
 			// As far as I can tell there is no need to be able to set the name,
 			// and doing so would be rather complicated.
 			name: ptr::null(),
-			channel_count: layout.channels.len() as c_int,
+
+			// Channel counts are silently truncated to SOUNDIO_MAX_CHANNELS.
+			channel_count: min(layout.channels.len(), raw::SOUNDIO_MAX_CHANNELS) as c_int,
 			channels: {
 				let mut c = [raw::SoundIoChannelId::SoundIoChannelIdInvalid; raw::SOUNDIO_MAX_CHANNELS];
-				for i in 0..min(c.len(), layout.channels.len()) {
+				for i in 0..min(layout.channels.len(), c.len()) {
 					c[i] = layout.channels[i].into();
 				}
 				c
