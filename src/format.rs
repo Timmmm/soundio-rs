@@ -46,8 +46,7 @@ pub enum Format {
 	Float64BE,
 }
 
-// TODO: Document these better and add examples. Check it works. Also there's probably a better way.
-
+/// This module provides some aliases for native endian formats, and foreign endian formats.
 #[cfg(target_endian = "big")]
 #[allow(non_upper_case_globals)]
 pub mod native {
@@ -87,6 +86,7 @@ pub mod native {
 	pub const Float64NE: Format = Format::Float64BE;
 }
 
+/// This module provides some aliases for native endian formats, and foreign endian formats.
 #[cfg(target_endian = "little")]
 #[allow(non_upper_case_globals)]
 pub mod native {
@@ -247,9 +247,7 @@ impl fmt::Display for Format {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let c_str: &CStr = unsafe { CStr::from_ptr(raw::soundio_format_string((*self).into())) };
 
-		// TODO: to_str() checks for valid UTF-8 since that what a &str is. Is it safe to assume
-		// soundio_strerror() never returns invalid UTF-8?
-		
+		// These are all ASCII. See https://github.com/andrewrk/libsoundio/blob/323fb1aa277674e2eb126234e3e6edf10ee45461/src/soundio.c#L76
 		f.write_str(c_str.to_str().unwrap())
 	}
 }
