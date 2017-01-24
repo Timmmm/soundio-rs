@@ -90,16 +90,17 @@ impl<'a> Device<'a> {
 		layouts_slice.iter().map(|&x| x.into()).collect()
 	}
 
-	/// 
-	/// See SoundIoDevice::current_format apparently?
-	// TODO: Write docs & examples.
+	/// Get the current channel layout. This behaves similarly to the current format
+	/// - this value is only meaningful for raw devices that have a sample
+	/// rate defined before a stream is opened. See `Device::current_format()` for
+	/// more information.
 	pub fn current_layout(&self) -> ChannelLayout {
 		unsafe { (*self.device).current_layout.into() }
 	}
 
-	/// List of formats this device supports. See also
-	/// SoundIoDevice::current_format.
-	// TODO: Write docs & examples.
+	/// List of formats this device supports.
+	///
+	/// Devices are guaranteed to support at least one format.
 	pub fn formats(&self) -> Vec<Format> {
 
 		let formats_slice = unsafe {
@@ -126,8 +127,6 @@ impl<'a> Device<'a> {
 	/// `Device::formats()`.
 	///
 	/// If `current_format()` is unavailable, it will be set to `Format::Invalid`.
-	///
-	/// Devices are guaranteed to have at least 1 format available.
 	pub fn current_format(&self) -> Format {
 		unsafe { (*self.device).current_format.into() }
 	}
@@ -162,8 +161,6 @@ impl<'a> Device<'a> {
 	/// more information.
 	///
 	/// If `current_sample_rate()` is unavailable it will return 0.
-	///
-	/// Devices are guaranteed to have at least 1 sample rate available.
 	pub fn current_sample_rate(&self) -> i32 {
 		unsafe { (*self.device).sample_rate_current as _ }
 	}
@@ -199,6 +196,8 @@ impl<'a> Device<'a> {
 	}
 
 	/// Sorts the channels returned by `layouts()` by channel count, descending.
+	///
+	/// This mutates the internal list of layouts, which is why it takes `&mut self`.
 	pub fn sort_channel_layouts(&mut self) {
 		// It may be a good idea to remove this function. I don't think it adds to the API.
 		unsafe {
@@ -295,6 +294,8 @@ impl<'a> Device<'a> {
 	/// * `underflow_callback` - Optional callback that is called when your `write_callback` is too slow and the output skips.
 	/// * `error_callback` - Optional error callback.
 	///
+	/// Currently it is not possible to set the outstream name, or libsoundio's `non_terminal_hint`.
+	///
 	/// # Return Values
 	///
 	/// If successful the function returns an `OutStream` which you can call `OutStream::start()` on,
@@ -339,16 +340,13 @@ impl<'a> Device<'a> {
 		}
 
 		unsafe {
-			(*outstream).sample_rate = sample_rate; // TODO: Check this sample rate is supported.
-			(*outstream).format = format.into(); // TODO: Check that this format is supported!
-			(*outstream).layout = layout.into(); // TODO: Check that this layout is supported!
-			(*outstream).software_latency = latency; // TODO: Should I set this?
+			(*outstream).sample_rate = sample_rate;
+			(*outstream).format = format.into();
+			(*outstream).layout = layout.into();
+			(*outstream).software_latency = latency;
 			(*outstream).write_callback = outstream_write_callback as *mut _;
 			(*outstream).underflow_callback = outstream_underflow_callback as *mut _;
 			(*outstream).error_callback = outstream_error_callback as *mut _;
-
-			// TODO: Allow setting (*outstream).name
-			// TODO: Allow setting (*outstream).non_terminal_hint
 		}
 
 		let mut stream = OutStream {
@@ -377,7 +375,6 @@ impl<'a> Device<'a> {
 			x => return Err(x.into()),
 		};
 
-		// TODO: Check this is the correct thing to do.
 		match unsafe { (*stream.userdata.outstream).layout_error } {
 			0 => {},
 			x => return Err(x.into()),
@@ -400,6 +397,8 @@ impl<'a> Device<'a> {
 	/// * `read_callback` - Required callback that is called to allow you to process audio data from the instream.
 	/// * `overflow_callback` - Optional callback that is called when your `read_callback` is too slow and skips some input.
 	/// * `error_callback` - Optional error callback.
+	///
+	/// Currently it is not possible to set the outstream name, or libsoundio's `non_terminal_hint`.
 	///
 	/// # Return Values
 	///
@@ -452,9 +451,6 @@ impl<'a> Device<'a> {
 			(*instream).read_callback = instream_read_callback as *mut _;
 			(*instream).overflow_callback = instream_overflow_callback as *mut _;
 			(*instream).error_callback = instream_error_callback as *mut _;
-
-			// TODO: Allow setting (*instream).name
-			// TODO: Allow setting (*instream).non_terminal_hint
 		}
 
 		let mut stream = InStream {
@@ -483,7 +479,6 @@ impl<'a> Device<'a> {
 			x => return Err(x.into()),
 		};
 
-		// TODO: Check this is the correct thing to do.
 		match unsafe { (*stream.userdata.instream).layout_error } {
 			0 => {},
 			x => return Err(x.into()),
