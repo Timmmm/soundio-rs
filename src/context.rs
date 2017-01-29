@@ -13,8 +13,9 @@ use std::marker::PhantomData;
 /// It must be created using `Context::new()` before most operations can be done and you
 /// generally will only have one context object per app.
 ///
-/// The underlying C struct is destroyed when this object is dropped, which means that it
-/// must outlive all the Devices it creates. This is enforced via the lifetime system.
+/// The underlying C struct is destroyed (and the backend is disconnected) when this object
+/// is dropped, which means that it must outlive all the Devices it creates. This is
+/// enforced via the lifetime system.
 ///
 /// # Examples
 ///
@@ -22,7 +23,6 @@ use std::marker::PhantomData;
 /// let mut ctx = soundio::Context::new();
 /// ```
 pub struct Context<'a> {
-
 	/// The soundio library instance.
 	soundio: *mut raw::SoundIo,
 	/// The app name, used by some backends.
@@ -39,24 +39,7 @@ pub struct ContextUserData<'a> {
 	events_signal_callback: Option<Box<FnMut() + 'a>>,
 }
 
-
-
-/// Optional callback. Called when the backend disconnects. For example,
-/// when the JACK server shuts down. When this happens, listing devices
-/// and opening streams will always fail with
-/// SoundIoErrorBackendDisconnected. This callback is only called during a
-/// call to ::soundio_flush_events or ::soundio_wait_events.
-/// If you do not supply a callback, the default will crash your program
-/// with an error message. This callback is also called when the thread
-/// that retrieves device information runs into an unrecoverable condition
-/// such as running out of memory.
-///
-/// Possible errors:
-/// * #SoundIoErrorBackendDisconnected
-/// * #SoundIoErrorNoMem
-/// * #SoundIoErrorSystemResources
-/// * #SoundIoErrorOpeningDevice - unexpected problem accessing device
-///   information
+// See `Context::new_with_callbacks()`.
 extern fn on_backend_disconnect(sio: *mut raw::SoundIo, err: c_int) {
 	let err = Error::from(err);
 	
@@ -67,12 +50,12 @@ extern fn on_backend_disconnect(sio: *mut raw::SoundIo, err: c_int) {
 	if let Some(ref mut cb) = userdata.backend_disconnect_callback {
 		cb(err);
 	} else {
-		println!("Backend disconnected: {}", err);
+		// Hmm I decided to replicate the libsoundio behaviour.
+		panic!("Backend disconnected: {}", err);
 	}
 }
 
-/// Called when the list of devices change. Only called
-/// during a call to ::soundio_flush_events or ::soundio_wait_events.
+// See `Context::new_with_callbacks()`.
 extern fn on_devices_change(sio: *mut raw::SoundIo) {
 	// Use sio.userdata to get a reference to the ContextUserData object.
 	let raw_userdata_pointer = unsafe { (*sio).userdata as *mut ContextUserData };
@@ -85,9 +68,7 @@ extern fn on_devices_change(sio: *mut raw::SoundIo) {
 	}
 }
 
-/// Optional callback. Called from an unknown thread that you should not use
-/// to call any soundio functions. You may use this to signal a condition
-/// variable to wake up. Called when ::soundio_wait_events would be woken up.
+// See `Context::new_with_callbacks()`.
 extern fn on_events_signal(sio: *mut raw::SoundIo) {
 	// Use sio.userdata to get a reference to the ContextUserData object.
 	let raw_userdata_pointer = unsafe { (*sio).userdata as *mut ContextUserData };
@@ -134,7 +115,8 @@ impl<'a> Context<'a> {
 
 		let mut context = Context { 
 			soundio: soundio,
-			app_name: String::new(),
+			// The default name in libsoundio is "SoundIo". We replicate that here for `Context::app_name()`.
+			app_name: "SoundIo".to_string(),
 			userdata: Box::new( ContextUserData {
 				backend_disconnect_callback: None,
 				devices_change_callback: None,
@@ -149,7 +131,7 @@ impl<'a> Context<'a> {
 			(*context.soundio).on_backend_disconnect = on_backend_disconnect as *mut extern fn(*mut raw::SoundIo, i32);
 			(*context.soundio).on_devices_change = on_devices_change as *mut extern fn(*mut raw::SoundIo);
 			(*context.soundio).on_events_signal = on_events_signal as *mut _;
-			(*context.soundio).app_name = ptr::null_mut(); 
+			// (*context.soundio).app_name is already set by default to point to a static C string "SoundIo".
 
 			// This callback is not used - see its documentation for more information.
 			// (*context.soundio).emit_rtprio_warning = emit_rtprio_warning as *mut _;
@@ -160,7 +142,53 @@ impl<'a> Context<'a> {
 		context
 	}
 
-
+	/// Create a new libsoundio context with some callbacks specified.
+	///
+	/// This is the same as `Context::new()` but allows you to specify the following optional callbacks.
+	///
+	/// ## `backend_disconnect_callback`
+	///
+	/// This is called when the backend disconnects. For example,
+	/// when the JACK server shuts down. When this happens, listing devices
+	/// and opening streams will always fail with
+	/// `Error::BackendDisconnected`. This callback is only called during a
+	/// call to `Context::flush_events()` or `Context::wait_events()`.
+	/// If you do not supply a callback, the default will panic
+	/// with an error message. This callback is also called when the thread
+	/// that retrieves device information runs into an unrecoverable condition
+	/// such as running out of memory.
+	///
+	/// The possible errors passed to the callback are:
+	///
+	/// * `Error::BackendDisconnected`
+	/// * `Error::NoMem`
+	/// * `Error::SystemResources`
+	/// * `Error::ErrorOpeningDevice - unexpected problem accessing device information
+	///
+	/// ## `devices_change_callback`
+	///
+	/// This is called when the list of devices change. It is only called during a call
+	/// to `Context::flush_events()` or `Context::`wait_events()`. The default behaviour is
+	/// to print "Devices changed" to the console, which you can disable by using an empty callback.
+	///
+	/// ## `events_signal_callback`
+	///
+	/// This is called from an unknown thread that you should not use
+	/// to call any soundio functions. You may use this to signal a condition
+	/// variable to wake up. It is called when `Context::wait_events()` would be woken up.
+	///
+	/// # Examples
+	///
+	/// ```
+	///
+	/// let backend_disconnect_callback = || { println!("Backend disconnected!"); };
+	///
+	/// let mut ctx = soundio::Context::new_with_callbacks(
+	///     Some(backend_disconnected_callback),
+	///     None,
+	///     None,
+	/// );
+	/// ```
 	pub fn new_with_callbacks<BackendDisconnectCB, DevicesChangeCB, EventsSignalCB> (
 				backend_disconnect_callback: Option<BackendDisconnectCB>,
 				devices_change_callback: Option<DevicesChangeCB>,
@@ -187,8 +215,9 @@ impl<'a> Context<'a> {
 		context
 	}
 
-	/// Set the app name. This is shown in JACK and some other backends. Any colons are removed. The max length is ? and the default is ?.
-	/// It must be called before ?? 
+	/// Set the app name. This is shown in JACK and PulseAudio. Any colons are removed. The default is "SoundIo".
+	///
+	/// This must be called before you connect to a backend.
 	///
 	/// ```
 	/// let mut ctx = soundio::Context::new();
@@ -330,29 +359,26 @@ impl<'a> Context<'a> {
 	/// times per second.
 	///
 	/// When you call this, the following callbacks might be called:
-	/// * SoundIo::on_devices_change
-	/// * SoundIo::on_backend_disconnect
-	/// This is the only time those callbacks can be called.
+	/// 
+	/// * `on_devices_change`
+	/// * `on_backend_disconnect`
+	///
+	/// The callbacks are specified in `Context::new_with_callbacks()`. This is the
+	/// only time those callbacks can be called.
 	///
 	/// This must be called from the same thread as the thread in which you call
-	/// these functions:
-	/// * ::soundio_input_device_count
-	/// * ::soundio_output_device_count
-	/// * ::soundio_get_input_device
-	/// * ::soundio_get_output_device
-	/// * ::soundio_default_input_device_index
-	/// * ::soundio_default_output_device_index
+	/// any function that gets an input or output device, count or index (e.g.
+	/// `Context::default_input_device_index()`).
 	///
 	/// Note that if you do not care about learning about updated devices, you
-	/// might call this function only once ever and never call
-	/// ::soundio_wait_events.
+	/// can call this function only once ever and never call `Context::wait_events()`.
 	pub fn flush_events(&self) {
 		unsafe {
 			raw::soundio_flush_events(self.soundio);
 		}
 	}
 
-	/// This function calls `flush_events` then blocks until another event
+	/// This function calls `Context::flush_events()` then blocks until another event
 	/// is ready or you call `wakeup`. Be ready for spurious wakeups.
 	pub fn wait_events(&self) {
 		unsafe {
@@ -360,10 +386,16 @@ impl<'a> Context<'a> {
 		}
 	}
 
-	/// Wake up any other threads calling wait_events().
-	/// TODO: For this to work, Context must be Send. I need to check exactly which functions can be called from
-	/// different threads and then maybe separate Context into two objects, one that is Send/Sync and one that isn't.
+	/// Wake up any other threads currently blocking in `Context::wait_events()`.
+	///
+	/// In order to enable this functionality, `Context` implements the `Send` and
+	/// `Sync` traits despite the fact that not all functions can be called from all threads.
+	/// Be careful.
 	pub fn wakeup(&self) {
+		
+		// To do this properly it might be necessary to split Context into multiple objects, one for
+		// each thread, or maybe one that is Send/Sync and another that isn't. That is rather
+		// complicated however and there is probably a better way.
 		unsafe {
 			raw::soundio_wakeup(self.soundio);
 		}
@@ -373,25 +405,41 @@ impl<'a> Context<'a> {
 	/// not ever have to call this function, as libsoundio listens to system events
 	/// for device changes and responds to them by rescanning devices and preparing
 	/// the new device information for you to be atomically replaced when you call
-	/// ::soundio_flush_events. However you might run into cases where you want to
-	/// force trigger a device rescan, for example if an ALSA device has a
-	/// SoundIoDevice::probe_error.
+	/// `Context::flush_events()`. However you might run into cases where you want to
+	/// force trigger a device rescan, for example if an ALSA device has a probe error.
 	///
-	/// After you call this you still have to use ::soundio_flush_events or
-	/// ::soundio_wait_events and then wait for the
-	/// SoundIo::on_devices_change callback.
+	/// After you call this you still have to use `Context::flush_events()` or
+	/// `Context::wait_events()` and then wait for the
+	/// `devices_change_callback` to be called.
 	///
-	/// This can be called from any thread context except for
-	/// SoundIoOutStream::write_callback and SoundIoInStream::read_callback
+	/// This can be called from any thread context except for the read or write callbacks.
 	pub fn force_device_scan(&self) {
 		unsafe {
 			raw::soundio_force_device_scan(self.soundio);
 		}
 	}
 
-	// Get a device, or None if the index is out of bounds or you never called flush_events()
-	// (you have to call flush_events() before getting devices).
-	pub fn get_input_device(&self, index: usize) -> Result<Device> {
+	/// Use this function to retrieve an input device given its index. Before getting devices
+	/// you must call `Context::flush_events()` at least once, otherwise this will return
+	/// an error. It will also return an error if there is a probe error while opening the
+	/// device or the index is out of bounds (use `Context::input_device_count()` to learn)
+	/// how many input devices there are.
+	///
+	/// It is probably more convenient to use the `Context::input_devices()` function instead
+	/// of this one unless you have some very specific requirements.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = soundio::Context::new();
+	/// ctx.connect()?;
+	/// ctx.flush_events();
+	/// for i in 0..ctx.input_device_count() {
+	///     let dev = ctx.input_device(i)?;
+	///     println!("Device {} is called {}", i, dev.name());
+	/// }
+	/// ```
+	pub fn input_device(&self, index: usize) -> Result<Device> {
 		let device = unsafe { raw::soundio_get_input_device(self.soundio, index as c_int) };
 		if device == ptr::null_mut() {
 			return Err(Error::OpeningDevice);
@@ -409,7 +457,27 @@ impl<'a> Context<'a> {
 		})
 	}
 
-	pub fn get_output_device(&self, index: usize) -> Result<Device> {
+	/// Use this function to retrieve an output device given its index. Before getting devices
+	/// you must call `Context::flush_events()` at least once, otherwise this will return
+	/// an error. It will also return an error if there is a probe error while opening the
+	/// device or the index is out of bounds (use `Context::output_device_count()` to learn)
+	/// how many output devices there are.
+	///
+	/// It is probably more convenient to use the `Context::output_devices()` function instead
+	/// of this one unless you have some very specific requirements.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = soundio::Context::new();
+	/// ctx.connect()?;
+	/// ctx.flush_events();
+	/// for i in 0..ctx.output_device_count() {
+	///     let dev = ctx.output_device(i)?;
+	///     println!("Device {} is called {}", i, dev.name());
+	/// }
+	/// ```
+	pub fn output_device(&self, index: usize) -> Result<Device> {
 		let device = unsafe { raw::soundio_get_output_device(self.soundio, index as c_int) };
 		if device == ptr::null_mut() {
 			return Err(Error::OpeningDevice);
@@ -427,21 +495,44 @@ impl<'a> Context<'a> {
 		})
 	}
 
-	/// Panics if you never called flush_events().
+	/// Get the number of input devices in this machine. You *must* call
+	/// `Context::flush_events()` at least once before calling this function
+	/// otherwise it will panic!
 	pub fn input_device_count(&self) -> usize {
 		let count = unsafe { raw::soundio_input_device_count(self.soundio) };
 		assert!(count != -1, "flush_events() must be called before input_device_count()");
 		count as _
 	}
 
-	/// Panics if you never called flush_events().
+	/// Get the number of output devices in this machine. You *must* call
+	/// `Context::flush_events()` at least once before calling this function
+	/// otherwise it will panic!
 	pub fn output_device_count(&self) -> usize {
 		let count = unsafe { raw::soundio_output_device_count(self.soundio) };
 		assert!(count != -1, "flush_events() must be called before output_device_count()");
 		count as _
 	}
 	
-	/// Returns None if there are no input devices, or you never called flush_events().
+	/// Returns the index of the default input device. You must call
+	/// `Context::flush_events()` at least once before calling this function.
+	/// If there are no input devices, or you never called `flush_events()` it
+	/// returns `None`
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = soundio::Context::new();
+	/// ctx.connect()?;
+	/// ctx.flush_events();
+	/// let default_input = ctx.default_input_device_index();
+	/// for i in 0..ctx.input_device_count() {
+	///     let dev = ctx.input_device(i)?;
+	///     println!("Device {} is called {}", i, dev.name());
+	///     if Some(i) == default_input {
+	///         println!("And it's the default!");
+	///     }
+	/// }
+	/// ```
 	pub fn default_input_device_index(&self) -> Option<usize> {
 		let index = unsafe { raw::soundio_default_input_device_index(self.soundio) };
 		match index {
@@ -450,7 +541,26 @@ impl<'a> Context<'a> {
 		}
 	}
 
-	/// Returns None if there are no input devices, or you never called flush_events().
+	/// Returns the index of the default output device. You must call
+	/// `Context::flush_events()` at least once before calling this function.
+	/// If there are no output devices, or you never called `flush_events()` it
+	/// returns `None`
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = soundio::Context::new();
+	/// ctx.connect()?;
+	/// ctx.flush_events();
+	/// let default_output = ctx.default_output_device_index();
+	/// for i in 0..ctx.output_device_count() {
+	///     let dev = ctx.output_device(i)?;
+	///     println!("Device {} is called {}", i, dev.name());
+	///     if Some(i) == default_output {
+	///         println!("And it's the default!");
+	///     }
+	/// }
+	/// ```
 	pub fn default_output_device_index(&self) -> Option<usize> {
 		let index = unsafe { raw::soundio_default_output_device_index(self.soundio) };
 		match index {
@@ -459,8 +569,22 @@ impl<'a> Context<'a> {
 		}
 	}
 
-	/// Get all the input devices. Panics if you never called flush_events().
+	/// Get all the input devices as a vector. You *must* call `Context::flush_events()`
+	/// at least once before calling this function. If you don't it will panic.
+	/// 
 	/// It returns an error if there is an error opening any of the devices.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = soundio::Context::new();
+	/// ctx.connect()?;
+	/// ctx.flush_events();
+	/// let devs = ctx.input_devices()?;
+	/// for dev in devs() {
+	///     println!("Device {} ", dev.name());
+	/// }
+	/// ```
 	pub fn input_devices(&self) -> Result<Vec<Device>> {
 		let count = self.input_device_count();
 		let mut devices = Vec::new();
@@ -470,8 +594,22 @@ impl<'a> Context<'a> {
 		Ok(devices)
 	}
 
-	/// Get all the input devices. Panics if you never called flush_events().
+	/// Get all the output devices as a vector. You *must* call `Context::flush_events()`
+	/// at least once before calling this function. If you don't it will panic.
+	/// 
 	/// It returns an error if there is an error opening any of the devices.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = soundio::Context::new();
+	/// ctx.connect()?;
+	/// ctx.flush_events();
+	/// let devs = ctx.output_devices()?;
+	/// for dev in devs() {
+	///     println!("Device {} ", dev.name());
+	/// }
+	/// ```
 	pub fn output_devices(&self) -> Result<Vec<Device>> {
 		let count = self.output_device_count();
 		let mut devices = Vec::new();
@@ -481,8 +619,21 @@ impl<'a> Context<'a> {
 		Ok(devices)
 	}
 
-	/// Get all the default input device. If you never called flush_events() it panics.
-	/// If there are no devices it returns Error::NoSuchDevice.
+	/// Get the default input device. You *must* call `Context::flush_events()`
+	/// at least once before calling this function. If you don't it will panic.
+	///
+	/// If there are no devices it returns `Error::NoSuchDevice`. If there was
+	/// an error opening the device it returns that error.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = soundio::Context::new();
+	/// ctx.connect()?;
+	/// ctx.flush_events();
+	/// let dev = ctx.default_input_device()?;
+	/// println!("The default input device is {}", dev.name());
+	/// ```
 	pub fn default_input_device(&self) -> Result<Device> {
 		let index = match self.default_input_device_index() {
 			Some(x) => x,
@@ -491,8 +642,21 @@ impl<'a> Context<'a> {
 		self.get_input_device(index)
 	}
 	
-	/// Get all the default output device. If you never called flush_events() it panics.
-	/// If there are no devices it returns Error::NoSuchDevice.
+	/// Get the default output device. You *must* call `Context::flush_events()`
+	/// at least once before calling this function. If you don't it will panic.
+	///
+	/// If there are no devices it returns `Error::NoSuchDevice`. If there was
+	/// an error opening the device it returns that error.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// let mut ctx = soundio::Context::new();
+	/// ctx.connect()?;
+	/// ctx.flush_events();
+	/// let dev = ctx.default_output_device()?;
+	/// println!("The default output device is {}", dev.name());
+	/// ```
 	pub fn default_output_device(&self) -> Result<Device> {
 		let index = match self.default_output_device_index() {
 			Some(x) => x,
@@ -535,4 +699,6 @@ mod tests {
 		let ctx = Context::new();
 		println!("Available backends: {:?}", ctx.available_backends());
 	}
+
+	// TODO: More tests.
 }
