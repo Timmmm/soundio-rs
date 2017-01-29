@@ -5,28 +5,41 @@ use super::error::*;
 use super::backend::*;
 
 use std::ptr;
-use std::result;
 use std::os::raw::{c_int, c_char};
 use std::marker::PhantomData;
 
-/// `Context` represents the libsoundio library.
+/// `Context` represents the libsoundio library context.
 ///
 /// It must be created using `Context::new()` before most operations can be done and you
 /// generally will only have one context object per app.
 ///
 /// The underlying C struct is destroyed when this object is dropped, which means that it
-/// must outlive all the Devices it creates. TODO: Enforce this using lifetimes.
+/// must outlive all the Devices it creates. This is enforced via the lifetime system.
 ///
 /// # Examples
 ///
 /// ```
 /// let mut ctx = soundio::Context::new();
 /// ```
-pub struct Context {
-	// The soundio library instance.
+pub struct Context<'a> {
+
+	/// The soundio library instance.
 	soundio: *mut raw::SoundIo,
+	/// The app name, used by some backends.
 	app_name: String,
+	/// The optional callbacks. They are boxed so that we can take a raw pointer
+	/// to the heap object and give use it as `void* userdata`.
+	userdata: Box<ContextUserData<'a>>,
 }
+
+// The callbacks required for a context are stored in this object.
+pub struct ContextUserData<'a> {
+	backend_disconnect_callback: Option<Box<FnMut(Error) + 'a>>,
+	devices_change_callback: Option<Box<FnMut() + 'a>>,
+	events_signal_callback: Option<Box<FnMut() + 'a>>,
+}
+
+
 
 /// Optional callback. Called when the backend disconnects. For example,
 /// when the JACK server shuts down. When this happens, listing devices
@@ -62,17 +75,21 @@ extern fn on_events_signal(_sio: *mut raw::SoundIo) {
 
 }
 
-/// Optional: Real time priority warning.
-/// This callback is fired when making thread real-time priority failed. By
-/// default, it will print to stderr only the first time it is called
-/// a message instructing the user how to configure their system to allow
-/// real-time priority threads. This must be set to a function not NULL.
-/// To silence the warning, assign this to a function that does nothing.
+/// Optional real time priority warning callback.
+///
+/// This callback is fired when making thread real-time priority failed. The default
+/// callback action prints a message instructing the user how to configure their
+/// system to allow real-time priority threads. The message is printed to stderr
+/// and is only printed once.
+///
+/// Because the callback doesn't take any `void* userdata` parameters
+/// I can't see an easy way to integrate it into the Rust API, so I have chosen
+/// to just use the default function. In otherwords the callback here is not used.
+#[allow(dead_code)]
 extern fn emit_rtprio_warning() {
-
 }
 
-impl Context {
+impl<'a> Context<'a> {
 
 	/// Create a new libsoundio context.
 	///
@@ -86,27 +103,64 @@ impl Context {
 	/// ```
 	/// let mut ctx = soundio::Context::new();
 	/// ```
-	pub fn new() -> Context {
+	pub fn new() -> Context<'a> {
 		let soundio = unsafe { raw::soundio_create() };
 		if soundio == ptr::null_mut() {
-			// TODO: abort() here instead of panicking.
 			panic!("soundio_create() failed (out of memory).");
 		}
 
-		let context = Context { 
+		let mut context = Context { 
 			soundio: soundio,
 			app_name: String::new(),
+			userdata: Box::new( ContextUserData {
+				backend_disconnect_callback: None,
+				devices_change_callback: None,
+				events_signal_callback: None,
+			})
 		};
 
 		// Note that libsoundio's default on_backend_disconnect() handler panics!
+		// That may actually be reasonable behaviour. I'm not sure under which conditions
+		// disconnects occur.
 		unsafe {
 			(*context.soundio).on_backend_disconnect = on_backend_disconnect as *mut extern fn(*mut raw::SoundIo, i32);
 			(*context.soundio).on_devices_change = on_devices_change as *mut extern fn(*mut raw::SoundIo);
+			(*context.soundio).on_events_signal = on_events_signal as *mut _;
 			(*context.soundio).app_name = ptr::null_mut(); 
 
-		// TODO: Save a reference here so that we can have user-defined callbacks (see OutStreamUserData).
-		//   (*context.soundio).userdata = &context;
+			// This callback is not used - see its documentation for more information.
+			// (*context.soundio).emit_rtprio_warning = emit_rtprio_warning as *mut _;
+
+			// Save a reference here so that we can have user-defined callbacks.
+			(*context.soundio).userdata = context.userdata.as_mut() as *mut ContextUserData as *mut _;
 		}
+		context
+	}
+
+
+	pub fn new_with_callbacks<BackendDisconnectCB, DevicesChangeCB, EventsSignalCB> (
+				backend_disconnect_callback: Option<BackendDisconnectCB>,
+				devices_change_callback: Option<DevicesChangeCB>,
+				events_signal_callback: Option<EventsSignalCB>,
+			) -> Context<'a>
+		where
+			BackendDisconnectCB: 'a + FnMut(Error),
+			DevicesChangeCB: 'a + FnMut(),
+			EventsSignalCB: 'a + FnMut() {
+		// A set of function like `fn set_XX_callback(&mut self, ...` might be a nicer interface
+		// but I am unsure about the safety implications.
+		let mut context = Context::new();
+
+		if let Some(cb) = backend_disconnect_callback {
+			context.userdata.backend_disconnect_callback = Some(Box::new(cb));
+		}
+		if let Some(cb) = devices_change_callback {
+			context.userdata.devices_change_callback = Some(Box::new(cb));
+		}
+		if let Some(cb) = events_signal_callback {
+			context.userdata.events_signal_callback = Some(Box::new(cb));
+		}
+
 		context
 	}
 
@@ -425,7 +479,7 @@ impl Context {
 	}
 }
 
-impl Drop for Context {
+impl<'a> Drop for Context<'a> {
 	fn drop(&mut self) {
 		unsafe {
 			// This also disconnects if necessary.
@@ -436,8 +490,8 @@ impl Drop for Context {
 
 // This allows wakeup and wait_events to be called from other threads.
 // TODO: Find out exactly the thread-safety properties of libsoundio.
-unsafe impl Send for Context {}
-unsafe impl Sync for Context {}
+unsafe impl<'a> Send for Context<'a> {}
+unsafe impl<'a> Sync for Context<'a> {}
 
 #[cfg(test)]
 mod tests {
