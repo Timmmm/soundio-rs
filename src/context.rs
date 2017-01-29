@@ -57,22 +57,45 @@ pub struct ContextUserData<'a> {
 /// * #SoundIoErrorSystemResources
 /// * #SoundIoErrorOpeningDevice - unexpected problem accessing device
 ///   information
-extern fn on_backend_disconnect(_sio: *mut raw::SoundIo, err: c_int) {
-	// TODO: Allow user-defined callback.
-	println!("Backend disconnected: {}", Error::from(err));
+extern fn on_backend_disconnect(sio: *mut raw::SoundIo, err: c_int) {
+	let err = Error::from(err);
+	
+	// Use sio.userdata to get a reference to the ContextUserData object.
+	let raw_userdata_pointer = unsafe { (*sio).userdata as *mut ContextUserData };
+	let userdata = unsafe { &mut (*raw_userdata_pointer) };
+
+	if let Some(ref mut cb) = userdata.backend_disconnect_callback {
+		cb(err);
+	} else {
+		println!("Backend disconnected: {}", err);
+	}
 }
 
 /// Called when the list of devices change. Only called
 /// during a call to ::soundio_flush_events or ::soundio_wait_events.
-extern fn on_devices_change(_sio: *mut raw::SoundIo) {
-	println!("Devices changed");
+extern fn on_devices_change(sio: *mut raw::SoundIo) {
+	// Use sio.userdata to get a reference to the ContextUserData object.
+	let raw_userdata_pointer = unsafe { (*sio).userdata as *mut ContextUserData };
+	let userdata = unsafe { &mut (*raw_userdata_pointer) };
+
+	if let Some(ref mut cb) = userdata.devices_change_callback {
+		cb();
+	} else {
+		println!("Devices changed");
+	}
 }
 
 /// Optional callback. Called from an unknown thread that you should not use
 /// to call any soundio functions. You may use this to signal a condition
 /// variable to wake up. Called when ::soundio_wait_events would be woken up.
-extern fn on_events_signal(_sio: *mut raw::SoundIo) {
+extern fn on_events_signal(sio: *mut raw::SoundIo) {
+	// Use sio.userdata to get a reference to the ContextUserData object.
+	let raw_userdata_pointer = unsafe { (*sio).userdata as *mut ContextUserData };
+	let userdata = unsafe { &mut (*raw_userdata_pointer) };
 
+	if let Some(ref mut cb) = userdata.events_signal_callback {
+		cb();
+	}
 }
 
 /// Optional real time priority warning callback.
