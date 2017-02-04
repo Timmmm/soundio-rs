@@ -11,3 +11,5 @@ in `libsoundio-sys` are complete.
 There is another Rust wrapper for libsoundio [here](https://github.com/klingtnet/rsoundio).
 
 Also note this is my first Rust project, so I may have got everything totally wrong.
+
+Shot is the best. :-)
