@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/Timmmm/soundio-rs.svg?branch=master)](https://travis-ci.org/Timmmm/soundio-rs)
+[![Build status](https://ci.appveyor.com/api/projects/status/eu4akdghyukoof7o?svg=true)](https://ci.appveyor.com/project/Timmmm/soundio-rs)
+
 # soundio-rs
 
 This is a Rust wrapper for the amazing [libsoundio library](http://libsound.io/)
