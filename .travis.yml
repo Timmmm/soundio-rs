@@ -1,5 +1,5 @@
 language: rust
-sudo: false
+sudo: required # To install g++-4.9
 dist: trusty
 
 rust: stable
@@ -10,8 +10,8 @@ addons:
         sources:
             - ubuntu-toolchain-r-test
         packages:
-            - g++-4.9
-    env: COMPILER=g++-4.9
+            - gcc-4.9
+    env: CC=gcc-4.9
 
 matrix:
     include:
@@ -35,4 +35,7 @@ branches:
         - master
 
 # Disable tests for now.
-script: cargo build --verbose
+script: 
+    - env
+    - which gcc-4.9
+    - cargo build --verbose
