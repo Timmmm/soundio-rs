@@ -11,7 +11,8 @@ addons:
             - ubuntu-toolchain-r-test
         packages:
             - gcc-4.9
-    env: CC=gcc-4.9
+
+env: CC=gcc-4.9
 
 matrix:
     include:
@@ -35,7 +36,5 @@ branches:
         - master
 
 # Disable tests for now.
-script: 
-    - env
-    - which gcc-4.9
+script:
     - cargo build --verbose
