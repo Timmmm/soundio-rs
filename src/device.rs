@@ -15,7 +15,7 @@ use std::slice;
 
 /// Device represents an input or output device.
 ///
-/// It is obtained from a `Context` using `Context::get_input_device()` or `Context::get_output_device()`.
+/// It is obtained from a `Context` using `Context::input_device()` or `Context::output_device()`.
 /// You can use it to open an input stream or output stream. 
 pub struct Device<'a> {
 	/// The raw pointer to the device.

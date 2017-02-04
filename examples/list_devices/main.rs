@@ -28,12 +28,12 @@ fn list_devices(watch: bool, short_output: bool, backend: soundio::Backend) -> R
 
 	println!("--------Input Devices--------\n");
 	for i in 0..input_count {
-		print_device(&ctx.get_input_device(i)?, default_input.map_or(false, |d| d == i), short_output);
+		print_device(&ctx.input_device(i)?, default_input.map_or(false, |d| d == i), short_output);
 	}
 
 	println!("--------Output Devices--------\n");
 	for i in 0..output_count {
-		print_device(&ctx.get_output_device(i)?, default_output.map_or(false, |d| d == i), short_output);
+		print_device(&ctx.output_device(i)?, default_output.map_or(false, |d| d == i), short_output);
 	}
 
 	println!("\n{} devices found", input_count + output_count);

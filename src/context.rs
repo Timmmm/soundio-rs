@@ -589,7 +589,7 @@ impl<'a> Context<'a> {
 		let count = self.input_device_count();
 		let mut devices = Vec::new();
 		for i in 0..count {
-			devices.push(self.get_input_device(i)?);
+			devices.push(self.input_device(i)?);
 		}
 		Ok(devices)
 	}
@@ -614,7 +614,7 @@ impl<'a> Context<'a> {
 		let count = self.output_device_count();
 		let mut devices = Vec::new();
 		for i in 0..count {
-			devices.push(self.get_output_device(i)?);
+			devices.push(self.output_device(i)?);
 		}
 		Ok(devices)
 	}
@@ -639,7 +639,7 @@ impl<'a> Context<'a> {
 			Some(x) => x,
 			None => return Err(Error::NoSuchDevice),
 		};
-		self.get_input_device(index)
+		self.input_device(index)
 	}
 	
 	/// Get the default output device. You *must* call `Context::flush_events()`
@@ -662,7 +662,7 @@ impl<'a> Context<'a> {
 			Some(x) => x,
 			None => return Err(Error::NoSuchDevice),
 		};
-		self.get_output_device(index)
+		self.output_device(index)
 	}
 }
 
