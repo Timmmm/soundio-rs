@@ -12,18 +12,27 @@ addons:
         packages:
             - gcc-4.9
 
-env: CC=gcc-4.9
-
 matrix:
     include:
         - os: linux
-          env: TARGET=i686-unknown-linux-musl
+          env:
+            - TARGET=i686-unknown-linux-musl
+            - CC=gcc-4.9
+
         - os: linux
-          env: TARGET=x86_64-unknown-linux-musl
+          env:
+            - TARGET=x86_64-unknown-linux-musl
+            - CC=gcc-4.9
+
         - os: osx
           env: TARGET=i686-apple-darwin
+          
         - os: osx
           env: TARGET=x86_64-apple-darwin
+
+    # Don't do default build.
+    exclude:
+        - env: 
 
 cache: cargo
 
