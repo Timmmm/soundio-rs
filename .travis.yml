@@ -26,13 +26,14 @@ matrix:
 
         - os: osx
           env: TARGET=i686-apple-darwin
-          
+
         - os: osx
           env: TARGET=x86_64-apple-darwin
 
-    # Don't do default build.
+    # Exclude default build. Yes this is a really weird way to do it.
+    # See https://github.com/travis-ci/travis-ci/issues/4681
     exclude:
-        - env: 
+        - rust: stable
 
 cache: cargo
 
