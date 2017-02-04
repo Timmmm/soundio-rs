@@ -4,6 +4,15 @@ dist: trusty
 
 rust: stable
 
+# libsoundio requires GCC 4.9 for C11 support and for stdatomic.h.
+addons:
+    apt:
+        sources:
+            - ubuntu-toolchain-r-test
+        packages:
+            - g++-4.9
+    env: COMPILER=g++-4.9
+
 matrix:
     include:
         - os: linux
