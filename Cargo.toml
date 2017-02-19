@@ -16,7 +16,7 @@ categories = ["multimedia", "multimedia::audio"]
 
 [dependencies]
 libc = "0.2"
-libsoundio-sys = { path = "libsoundio-sys", version = "0.1.0" }
+libsoundio-sys = { path = "libsoundio-sys", version = "0.2.0" }
 
 # Examples
 
