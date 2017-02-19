@@ -1,7 +1,7 @@
 [![Build Status](https://travis-ci.org/Timmmm/soundio-rs.svg?branch=master)](https://travis-ci.org/Timmmm/soundio-rs)
 [![Build status](https://ci.appveyor.com/api/projects/status/eu4akdghyukoof7o?svg=true)](https://ci.appveyor.com/project/Timmmm/soundio-rs)
 [![Crates.io](https://img.shields.io/crates/v/soundio.svg)](https://crates.io/crates/soundio)
-[![Docs](https://docs.rs/mio/badge.svg)](https://docs.rs/soundio/)
+[![Docs](https://docs.rs/soundio/badge.svg)](https://docs.rs/soundio/)
 
 # soundio-rs
 
