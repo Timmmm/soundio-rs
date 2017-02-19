@@ -46,6 +46,29 @@ pub enum Format {
 	Float64BE,
 }
 
+/// This is a small helper type to find the endianness of a sample format.
+pub enum Endian {
+	Big,
+	Little,
+}
+
+/// Return the endianness of a sample format. `Format::Invalid`,
+/// `Format::S8` and `Format::U8` return `Endian::Little`.
+///
+/// # Examples
+///
+/// ```
+/// assert_eq!(endianness(Format::S24LE, Endian::Little);
+/// assert_eq!(endianness(Format::U8, Endian::Little);
+/// assert_eq!(endianness(Format::Float64BE, Endian::Big);
+/// ```
+pub fn endianness(f: Format) -> Endian {
+	match f {
+		Format::Invalid | Format::U8 | Format::S8 | Format::U16LE | Format::S16LE | Format::U24LE | Format::S24LE | Format::U32LE | Format::S32LE | Format::Float32LE | Format::Float64LE => Endian::Little,
+		                                            Format::U16BE | Format::S16BE | Format::U24BE | Format::S24BE | Format::U32BE | Format::S32BE | Format::Float32BE | Format::Float64BE => Endian::Big,
+	}
+}
+
 /// This module provides some aliases for native endian formats, and foreign endian formats.
 #[cfg(target_endian = "big")]
 #[allow(non_upper_case_globals)]
