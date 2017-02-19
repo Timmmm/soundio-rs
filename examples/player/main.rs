@@ -30,10 +30,10 @@ impl WavPlayer {
     		for c in 0..stream.channel_count() {
 				match s.next() {
 					Some(x) => {
-						stream.set_sample_typed::<i16>(c, f, x.unwrap()); 
+						stream.set_sample::<i16>(c, f, x.unwrap()); 
 					},
 					None => {
-						stream.set_sample_typed::<i16>(c, f, 0);
+						stream.set_sample::<i16>(c, f, 0);
 						self.finished = true;
 					}
 				}
@@ -65,7 +65,7 @@ fn play(filename: &str) -> Result<(), String> {
 	println!("Soundio version: {}", soundio::version_string());
 
 	let mut ctx = soundio::Context::new();
-    ctx.set_app_name("Player");
+	ctx.set_app_name("Player");
 	ctx.connect()?;
 
 	println!("Current backend: {:?}", ctx.current_backend());
@@ -158,7 +158,7 @@ fn play(filename: &str) -> Result<(), String> {
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+	let args: Vec<String> = env::args().collect();
 	if args.len() != 2 {
 		println!("Usage: {} <filename.wav>", args[0]);
 		return;

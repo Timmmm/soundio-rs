@@ -22,7 +22,7 @@ impl WavRecorder {
 
 		for f in 0..stream.frame_count() {
 			for c in 0..stream.channel_count() {
-				match self.writer.write_sample(stream.sample_typed::<i16>(c, f)) {
+				match self.writer.write_sample(stream.sample::<i16>(c, f)) {
 					Ok(_) => {},
 					Err(e) => println!("Error: {}", e),
 				}
