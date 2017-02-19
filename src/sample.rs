@@ -1,4 +1,4 @@
-//! This is a simple module that defines one trait for audio samples in various formats, and implements it
+//! This is a simple crate that defines one trait for audio samples in various formats, and implements it
 //! for the common sample formats. Because there is no native `u24` or `i24` I added one via the newtype
 //! pattern using `u32` and `i32`.
 
@@ -57,13 +57,13 @@ pub trait Sample {
 	fn to_f64(v: Self) -> f64;
 
 	// Convert from raw little endian bytes.
-	fn from_raw_le(ptr: *const u8) -> Self;
+	unsafe fn from_raw_le(ptr: *const u8) -> Self;
 	// Convert from raw big endian bytes.
-	fn from_raw_be(ptr: *const u8) -> Self;
+	unsafe fn from_raw_be(ptr: *const u8) -> Self;
 	// Convert to raw little endian bytes.
-	fn to_raw_le(v: Self, ptr: *mut u8);
+	unsafe fn to_raw_le(v: Self, ptr: *mut u8);
 	// Convert to raw big endian bytes.
-	fn to_raw_be(v: Self, ptr: *mut u8);
+	unsafe fn to_raw_be(v: Self, ptr: *mut u8);
 }
 
 #[allow(non_camel_case_types)]
@@ -117,52 +117,40 @@ macro_rules! impl_to_methods {
 
 macro_rules! impl_raw_methods {
 	() => {
-		fn from_raw_le(ptr: *const u8) -> Self {
-			Self::from_le( unsafe {
-				*(ptr as *const _)
-			} )
+		unsafe fn from_raw_le(ptr: *const u8) -> Self {
+			Self::from_le(*(ptr as *const _))
 		}
-		fn from_raw_be(ptr: *const u8) -> Self {
-			Self::from_be( unsafe {
-				*(ptr as *const _)
-			} )
+		unsafe fn from_raw_be(ptr: *const u8) -> Self {
+			Self::from_be(*(ptr as *const _))
 		}
-		fn to_raw_le(v: Self, ptr: *mut u8) {
-			unsafe {
-				*(ptr as *mut _) = Self::to_le(v);
-			}
+		unsafe fn to_raw_le(v: Self, ptr: *mut u8) {
+			*(ptr as *mut _) = Self::to_le(v);
 		}
-		fn to_raw_be(v: Self, ptr: *mut u8) {
-			unsafe {
-				*(ptr as *mut _) = Self::to_be(v);
-			}
+		unsafe fn to_raw_be(v: Self, ptr: *mut u8) {
+			*(ptr as *mut _) = Self::to_be(v);
 		}
 	}
 }
 
 macro_rules! impl_raw_methods_24 {
 	($ty_24:ident, $ty_32:ident) => {
-		fn from_raw_le(ptr: *const u8) -> Self {
-			$ty_24($ty_32::from_raw_le(ptr) & 0x00FFFFFF)
+		unsafe fn from_raw_le(ptr: *const u8) -> Self {
+			// TODO: This seems like a suboptimal implementation.
+			$ty_24(((u32::from_raw_le(ptr) << 8) as $ty_32) >> 8)
 		}
-		fn from_raw_be(ptr: *const u8) -> Self {
-			unsafe {
-				$ty_24($ty_32::from_raw_be(ptr.offset(3)) & 0x00FFFFFF)
-			}
+		unsafe fn from_raw_be(ptr: *const u8) -> Self {
+			// TODO: This seems like a suboptimal implementation.
+			$ty_24(((u32::from_raw_le(ptr.offset(3)) << 8) as $ty_32) >> 8)
 		}
-		fn to_raw_le(v: Self, ptr: *mut u8) {
-			unsafe {
-				*ptr = (v.0 & 0xFF) as u8;
-				*ptr.offset(1) = ((v.0 >> 8) & 0xFF) as u8;
-				*ptr.offset(2) = ((v.0 >> 16) & 0xFF) as u8;
-			}
+		unsafe fn to_raw_le(v: Self, ptr: *mut u8) {
+			*ptr = (v.0 & 0xFF) as u8;
+			*ptr.offset(1) = ((v.0 >> 8) & 0xFF) as u8;
+			*ptr.offset(2) = ((v.0 >> 16) & 0xFF) as u8;
 		}
-		fn to_raw_be(v: Self, ptr: *mut u8) {
-			unsafe {
-				*ptr = ((v.0 >> 16) & 0xFF) as u8;
-				*ptr.offset(1) = ((v.0 >> 8) & 0xFF) as u8;
-				*ptr.offset(2) = (v.0 & 0xFF) as u8;
-			}
+		unsafe fn to_raw_be(v: Self, ptr: *mut u8) {
+			*ptr = ((v.0 >> 16) & 0xFF) as u8;
+			*ptr.offset(1) = ((v.0 >> 8) & 0xFF) as u8;
+			*ptr.offset(2) = (v.0 & 0xFF) as u8;
 		}
 	}
 }
@@ -343,25 +331,17 @@ impl Sample for i32 {
 
 macro_rules! impl_float_raw_methods {
 	($uint_ty:ident) => {
-		fn from_raw_le(ptr: *const u8) -> Self {
-			unsafe {
-				std::mem::transmute($uint_ty::from_le(*(ptr as *const _)))
-			}
+		unsafe fn from_raw_le(ptr: *const u8) -> Self {
+			std::mem::transmute($uint_ty::from_le(*(ptr as *const _)))
 		}
-		fn from_raw_be(ptr: *const u8) -> Self {
-			unsafe {
-				std::mem::transmute($uint_ty::from_be(*(ptr as *const _)))
-			}
+		unsafe fn from_raw_be(ptr: *const u8) -> Self {
+			std::mem::transmute($uint_ty::from_be(*(ptr as *const _)))
 		}
-		fn to_raw_le(v: Self, ptr: *mut u8) {
-			unsafe {
-				*(ptr as *mut _) = $uint_ty::to_le(std::mem::transmute(v));
-			}
+		unsafe fn to_raw_le(v: Self, ptr: *mut u8) {
+			*(ptr as *mut _) = $uint_ty::to_le(std::mem::transmute(v));
 		}
-		fn to_raw_be(v: Self, ptr: *mut u8) {
-			unsafe {
-				*(ptr as *mut _) = $uint_ty::to_le(std::mem::transmute(v));
-			}
+		unsafe fn to_raw_be(v: Self, ptr: *mut u8) {
+			*(ptr as *mut _) = $uint_ty::to_le(std::mem::transmute(v));
 		}
 	}
 }
@@ -451,6 +431,7 @@ mod tests {
 		assert_eq!(f32::from_u8(128), 0.0);
 		assert_eq!(f32::from_u8(192), 0.5);
 	}
+
 	#[test]
 	fn int_through_float_lossless() {
 		for v in u8::min_value()..u8::max_value() {
@@ -460,6 +441,7 @@ mod tests {
 			assert_eq!(v, u16::from_f64(f64::from_i24(i24::from_u16(v))));
 		}
 	}
+
 	#[test]
 	fn out_of_range_float() {
 		assert_eq!(0, u8::from_f64(-1.0));
@@ -471,5 +453,38 @@ mod tests {
 		assert_eq!(-128, i8::from_f64(-10.0));
 		assert_eq!(127, i8::from_f64(1.0));
 		assert_eq!(127, i8::from_f64(10.0));
+	}
+
+	#[test]
+	fn raw_lossless() {
+		unsafe {
+			let mut buffer = [0u8; 32];
+			
+			let ptr = &mut buffer[0] as *mut u8;
+
+			for v in u8::min_value()..u8::max_value() {
+				u8::to_raw_le(v, ptr);
+				assert_eq!(v, u8::from_raw_le(ptr));
+				assert_eq!(v.swap_bytes(), u8::from_raw_be(ptr));
+			}
+			for v in i8::min_value()..i8::max_value() {
+				i8::to_raw_le(v, ptr);
+				assert_eq!(v, i8::from_raw_le(ptr));
+				assert_eq!(v.swap_bytes(), i8::from_raw_be(ptr));
+			}
+			for v in u16::min_value()..u16::max_value() {
+				u16::to_raw_le(v, ptr);
+				assert_eq!(v, u16::from_raw_le(ptr));
+				assert_eq!(v.swap_bytes(), u16::from_raw_be(ptr));
+			}
+			for v in u24::min_value()..u24::max_value() {
+				u24::to_raw_le(u24(v), ptr);
+				assert_eq!(u24(v), u24::from_raw_le(ptr));
+			}
+			for v in i24::min_value()..i24::max_value() {
+				i24::to_raw_le(i24(v), ptr);
+				assert_eq!(i24(v), i24::from_raw_le(ptr));
+			}
+		}
 	}
 }
