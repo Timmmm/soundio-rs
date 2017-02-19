@@ -4,7 +4,6 @@ version = "0.2.0"
 authors = ["Tim Hutt <tdhutt@gmail.com>"]
 license = "MIT"
 readme = "Readme.md"
-keywords = ["audio", "sound"]
 repository = "https://github.com/Timmmm/soundio-rs"
 homepage = "https://github.com/Timmmm/soundio-rs"
 documentation = "https://github.com/Timmmm/soundio-rs"
