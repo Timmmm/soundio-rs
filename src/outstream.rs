@@ -3,15 +3,18 @@ extern crate libsoundio_sys as raw;
 use super::error::*;
 use super::format::*;
 use super::util::*;
+use super::sample::*;
 
 use std::ptr;
 use std::os::raw::{c_int, c_double};
 use std::marker::PhantomData;
 use std::slice;
-use std::mem;
 
+/// This is called when an outstream needs to be written to. The `OutStreamUserData` struct is obtained
+/// from the stream.userdata, then the user-supplied callback is called with an `OutStreamWriter`
+/// object.
 pub extern fn outstream_write_callback(stream: *mut raw::SoundIoOutStream, frame_count_min: c_int, frame_count_max: c_int) {
-	// Use stream.userdata to get a reference to the OutStream object.
+	// Use stream.userdata to get a reference to the OutStreamUserData object.
 	let raw_userdata_pointer = unsafe { (*stream).userdata as *mut OutStreamUserData };
 	let userdata = unsafe { &mut (*raw_userdata_pointer) };
 
@@ -29,7 +32,7 @@ pub extern fn outstream_write_callback(stream: *mut raw::SoundIoOutStream, frame
 }
 
 pub extern fn outstream_underflow_callback(stream: *mut raw::SoundIoOutStream) {
-	// Use stream.userdata to get a reference to the OutStream object.
+	// Use stream.userdata to get a reference to the OutStreamUserData object.
 	let raw_userdata_pointer = unsafe { (*stream).userdata as *mut OutStreamUserData };
 	let userdata = unsafe { &mut (*raw_userdata_pointer) };
 
@@ -41,7 +44,7 @@ pub extern fn outstream_underflow_callback(stream: *mut raw::SoundIoOutStream) {
 }
 
 pub extern fn outstream_error_callback(stream: *mut raw::SoundIoOutStream, err: c_int) {
-	// Use stream.userdata to get a reference to the OutStream object.
+	// Use stream.userdata to get a reference to the OutStreamUserData object.
 	let raw_userdata_pointer = unsafe { (*stream).userdata as *mut OutStreamUserData };
 	let userdata = unsafe { &mut (*raw_userdata_pointer) };
 
@@ -55,8 +58,7 @@ pub extern fn outstream_error_callback(stream: *mut raw::SoundIoOutStream, err: 
 /// OutStream represents an output stream for playback.
 ///
 /// It is obtained from `Device` using `Device::open_outstream()` and
-/// can be started, paused, and stopped.
-
+/// can be started and paused.
 pub struct OutStream<'a> {
 	pub userdata: Box<OutStreamUserData<'a>>,
 	
@@ -65,7 +67,7 @@ pub struct OutStream<'a> {
 }
 
 // The callbacks required for an outstream are stored in this object. We also store a pointer
-// to the raw outstream so that it can be passed to OutStreamWriter in the write callback.
+// to the raw outstream so that it can be passed to `OutStreamWriter` in the write callback.
 pub struct OutStreamUserData<'a> {
 	pub outstream: *mut raw::SoundIoOutStream,
 
@@ -83,16 +85,22 @@ impl<'a> Drop for OutStreamUserData<'a> {
 }
 
 impl<'a> OutStream<'a> {
-
-	/// After you call this function, SoundIoOutStream::write_callback will be called.
+	/// Starts the stream, returning `Ok(())` if it started successfully. Once
+	/// started the write callback will be periodically called according to the
+	/// requested latency.
 	///
-	/// This function might directly call SoundIoOutStream::write_callback.
+	/// `start()` should only ever be called once on an `OutStream`.
+	/// Do not use `start()` to resume a stream after pausing it. Instead call `pause(false)`.
+	/// 
+	/// This function might directly call the write callback.
 	///
-	/// Possible errors:
-	/// * #SoundIoErrorStreaming
-	/// * #SoundIoErrorNoMem
-	/// * #SoundIoErrorSystemResources
-	/// * #SoundIoErrorBackendDisconnected
+	/// # Errors
+	///
+	/// * `Error::Streaming`
+	/// * `Error::NoMem`
+	/// * `Error::SystemResources`
+	/// * `Error::BackendDisconnected`
+	///
 	pub fn start(&mut self) -> Result<()> {
 		match unsafe { raw::soundio_outstream_start(self.userdata.outstream) } {
 			0 => Ok(()),
@@ -101,18 +109,20 @@ impl<'a> OutStream<'a> {
 	}
 
 	/// Clears the output stream buffer.
-	/// This function can be called from any thread.
-	/// This function can be called regardless of whether the outstream is paused
-	/// or not.
-	/// Some backends do not support clearing the buffer. On these backends this
-	/// function will return SoundIoErrorIncompatibleBackend.
-	/// Some devices do not support clearing the buffer. On these devices this
-	/// function might return SoundIoErrorIncompatibleDevice.
-	/// Possible errors:
 	///
-	/// * #SoundIoErrorStreaming
-	/// * #SoundIoErrorIncompatibleBackend
-	/// * #SoundIoErrorIncompatibleDevice
+	/// This function can be called regardless of whether the outstream is paused
+	/// or not. Some backends do not support clearing the buffer. On these backends this
+	/// function will return `Error::IncompatibleBackend`.
+	///
+	/// Some devices do not support clearing the buffer. On these devices this
+	/// function might return `Error::IncompatibleDevice`.
+	///
+	/// # Errors
+	///
+	/// * `Error::Streaming`
+	/// * `Error::IncompatibleBackend`
+	/// * `Error::IncompatibleDevice`
+	///
 	pub fn clear_buffer(&mut self) -> Result<()> {
 		match unsafe { raw::soundio_outstream_clear_buffer(self.userdata.outstream) } {
 			0 => Ok(()),
@@ -120,25 +130,30 @@ impl<'a> OutStream<'a> {
 		}
 	}
 
+	// TODO: pause() can be called from the write callback, so add it to 
+	// OutStreamWriter.
+
 	/// If the underlying backend and device support pausing, this pauses the
-	/// stream. SoundIoOutStream::write_callback may be called a few more times if
+	/// stream. The `write_callback()` may be called a few more times if
 	/// the buffer is not full.
+	///
 	/// Pausing might put the hardware into a low power state which is ideal if your
 	/// software is silent for some time.
-	/// This function may be called from any thread context, including
-	/// SoundIoOutStream::write_callback.
-	/// Pausing when already paused or unpausing when already unpaused has no
-	/// effect and returns #SoundIoErrorNone.
 	///
-	/// Possible errors:
-	/// * #SoundIoErrorBackendDisconnected
-	/// * #SoundIoErrorStreaming
-	/// * #SoundIoErrorIncompatibleDevice - device does not support
-	///   pausing/unpausing. This error code might not be returned even if the
-	///   device does not support pausing/unpausing.
-	/// * #SoundIoErrorIncompatibleBackend - backend does not support
-	///   pausing/unpausing.
-	/// * #SoundIoErrorInvalid - outstream not opened and started
+	/// This should not be called before `start()`. Pausing when already paused or
+	/// unpausing when already unpaused has no effect and returns `Ok(())`.
+	///
+	/// # Errors
+	///
+	/// * `Error::BackendDisconnected`
+	/// * `Error::Streaming`
+	/// * `Error::IncompatibleDevice` - device does not support
+	///    pausing/unpausing. This error code might not be returned even if the
+	///    device does not support pausing/unpausing.
+	/// * `Error::IncompatibleBackend` - backend does not support
+	///    pausing/unpausing.
+	/// * `Error::Invalid` - outstream not opened and started
+	///
 	pub fn pause(&mut self, pause: bool) -> Result<()> {
 		match unsafe { raw::soundio_outstream_pause(self.userdata.outstream, pause as i8) } {
 			0 => Ok(()),
@@ -146,8 +161,7 @@ impl<'a> OutStream<'a> {
 		}
 	}
 
-	/// Defaults to #SoundIoFormatFloat32NE, followed by the first one
-	/// supported.
+	/// Returns the stream format.
 	pub fn format(&self) -> Format {
 		unsafe {
 			(*self.userdata.outstream).format.into()
@@ -155,7 +169,6 @@ impl<'a> OutStream<'a> {
 	}
 
 	/// Sample rate is the number of frames per second.
-	/// Defaults to 48000 (and then clamped into range).
 	pub fn sample_rate(&self) -> i32 {
 		unsafe {
 			(*self.userdata.outstream).sample_rate as _
@@ -164,11 +177,12 @@ impl<'a> OutStream<'a> {
 
 	/// Ignoring hardware latency, this is the number of seconds it takes for
 	/// the last sample in a full buffer to be played.
-	/// After you call ::soundio_outstream_open, this value is replaced with the
+	/// After you call `Device::open_instream()`, this value is replaced with the
 	/// actual software latency, as near to this value as possible.
+	///
 	/// On systems that support clearing the buffer, this defaults to a large
 	/// latency, potentially upwards of 2 seconds, with the understanding that
-	/// you will call ::soundio_outstream_clear_buffer when you want to reduce
+	/// you will call `clear_buffer()` when you want to reduce
 	/// the latency to 0. On systems that do not support clearing the buffer,
 	/// this defaults to a reasonable lower latency value.
 	///
@@ -180,37 +194,44 @@ impl<'a> OutStream<'a> {
 	/// will get glitches.
 	///
 	/// If the device has unknown software latency min and max values, you may
-	/// still set this, but you might not get the value you requested.
+	/// still set this (in `Device::open_outstream()`), but you might not get
+	/// the value you requested.
 	/// For PulseAudio, if you set this value to non-default, it sets
 	/// `PA_STREAM_ADJUST_LATENCY` and is the value used for `maxlength` and
 	/// `tlength`.
 	///
 	/// For JACK, this value is always equal to
-	/// SoundIoDevice::software_latency_current of the device.
+	/// `Device::software_latency().current`.
 	pub fn software_latency(&self) -> f64 {
 		unsafe {
 			(*self.userdata.outstream).software_latency as _
 		}
 	}
 
-    /// Optional: Name of the stream. Defaults to "SoundIoOutStream"
+	/// The name of the stream, which defaults to "SoundIoOutStream".
+	///
     /// PulseAudio uses this for the stream name.
     /// JACK uses this for the client name of the client that connects when you
     /// open the stream.
     /// WASAPI uses this for the session display name.
     /// Must not contain a colon (":").
+	///
+	/// TODO: Currently there is no way to set this.
 	pub fn name(&self) -> String {
 		unsafe {
 			utf8_to_string((*self.userdata.outstream).name)
 		}
 	}
 
+	/// The number of bytes per frame, equal to the number of bytes
+	/// per sample, multiplied by the number of channels.
 	pub fn bytes_per_frame(&self) -> i32 {
 		unsafe {
 			(*self.userdata.outstream).bytes_per_frame as _
 		}
 	}
 
+	/// The number of bytes in a sample, e.g. 3 for `i24`.
 	pub fn bytes_per_sample(&self) -> i32 {
 		unsafe {
 			(*self.userdata.outstream).bytes_per_sample as _
@@ -218,10 +239,11 @@ impl<'a> OutStream<'a> {
 	}
 }
 
-/// OutStreamWriter is passed to the write callback and can be used to write to the stream.
+/// `OutStreamWriter` is passed to the write callback and can be used to write to the stream.
 ///
-/// You start by calling `begin_write()` which yields a ChannelAreas object that you can
-/// actually alter. When the ChannelAreas is dropped, the write is committed.
+/// You start by calling `begin_write()` then you can write the samples. When the `OutStreamWriter``
+/// is dropped the write is committed. An error at that point is written to the console and ignored.
+///
 pub struct OutStreamWriter<'a> {
 	outstream: *mut raw::SoundIoOutStream,
 	frame_count_min: usize,
@@ -242,40 +264,27 @@ impl<'a> OutStreamWriter<'a> {
 	/// Start a write. You can only call this once per callback otherwise it panics.
 	///
 	/// frame_count is the number of frames you want to write. It must be between
-	/// frame_count_min and frame_count_max.
-
-
-	/// Call this function when you are ready to begin writing to the device buffer.
-	///  * `outstream` - (in) The output stream you want to write to.
-	///  * `areas` - (out) The memory addresses you can write data to, one per
-	///    channel. It is OK to modify the pointers if that helps you iterate.
-	///  * `frame_count` - (in/out) Provide the number of frames you want to write.
-	///    Returned will be the number of frames you can actually write, which is
-	///    also the number of frames that will be written when you call
-	///    ::soundio_outstream_end_write. The value returned will always be less
-	///    than or equal to the value provided.
-	/// It is your responsibility to call this function exactly as many times as
-	/// necessary to meet the `frame_count_min` and `frame_count_max` criteria from
-	/// SoundIoOutStream::write_callback.
-	/// You must call this function only from the SoundIoOutStream::write_callback thread context.
-	/// After calling this function, write data to `areas` and then call
-	/// ::soundio_outstream_end_write.
-	/// If this function returns an error, do not call ::soundio_outstream_end_write.
+	/// frame_count_min and frame_count_max or `begin_write()` will panic.
 	///
-	/// Possible errors:
-	/// * #SoundIoErrorInvalid
-	///   * `*frame_count` <= 0
-	///   * `*frame_count` < `frame_count_min` or `*frame_count` > `frame_count_max`
+	/// It returns the number of frames you must actually write. The returned value
+	/// will always be less than or equal to the provided value.
+	///
+	/// # Errors
+	///
+	/// * `Error::Invalid`
+	///   * `frame_count` <= 0
+	///   * `frame_count` < `frame_count_min` or `frame_count` > `frame_count_max`
 	///   * function called too many times without respecting `frame_count_max`
-	/// * #SoundIoErrorStreaming
-	/// * #SoundIoErrorUnderflow - an underflow caused this call to fail. You might
-	///   also get a SoundIoOutStream::underflow_callback, and you might not get
-	///   this error code when an underflow occurs. Unlike #SoundIoErrorStreaming,
+	/// * `Error::Streaming`
+	/// * `Error::Underflow` - an underflow caused this call to fail. You might
+	///   also get an `underflow_callback()`, and you might not get
+	///   this error code when an underflow occurs. Unlike `Error::Streaming`,
 	///   the outstream is still in a valid state and streaming can continue.
-	/// * #SoundIoErrorIncompatibleDevice - in rare cases it might just now
+	/// * `Error::IncompatibleDevice` - in rare cases it might just now
 	///   be discovered that the device uses non-byte-aligned access, in which
 	///   case this error code is returned.
-	pub fn begin_write(&mut self, frame_count: usize) -> Result<()> {
+	///
+	pub fn begin_write(&mut self, frame_count: usize) -> Result<usize> {
 		assert!(!self.write_started, "begin_write() called twice!");
 		assert!(frame_count >= self.frame_count_min && frame_count <= self.frame_count_max, "frame_count out of range");
 
@@ -289,59 +298,65 @@ impl<'a> OutStreamWriter<'a> {
 				let cc = self.channel_count();
 				self.channel_areas = vec![raw::SoundIoChannelArea { ptr: ptr::null_mut(), step: 0 }; cc];
 				unsafe { self.channel_areas.copy_from_slice(slice::from_raw_parts::<raw::SoundIoChannelArea>(areas, cc)); }
-				Ok(())
+				Ok(actual_frame_count as _)
 			},
 			e => Err(e.into()),
 		}
 	}
 	
-	/// Get the minimum frame count that you can call begin_write() with.
+	/// Get the minimum frame count that you can call `begin_write()` with.
+	/// Retreive this value before calling `begin_write()` to ensure you read the correct number
+	/// of frames.
 	pub fn frame_count_min(&self) -> usize {
 		self.frame_count_min
 	}
 
-	/// Get the maximum frame count that you can call begin_write() with.
+	/// Get the maximum frame count that you can call `begin_write()` with.
+	/// Retreive this value before calling `begin_write()` to ensure you read the correct number
+	/// of frames.
 	pub fn frame_count_max(&self) -> usize {
 		self.frame_count_max
 	}
 
-	/// Get the actual frame count that you did call begin_write() with. Panics if you haven't yet.
+	/// Get the actual frame count that you did call `begin_write()` with. Panics if you haven't called
+	/// `begin_write()` yet.
 	pub fn frame_count(&self) -> usize {
 		assert!(self.write_started);
 		self.frame_count
 	}
 
-	// Get latency due to software only, not including hardware.
+	/// Get latency due to software only, not including hardware.
 	pub fn software_latency(&self) -> f64 {
 		unsafe {
 			(*self.outstream).software_latency as _
 		}
 	}
 
+	/// Return the number of channels in this stream. Guaranteed to be at least 1.
 	pub fn channel_count(&self) -> usize {
 		unsafe {
 			(*self.outstream).layout.channel_count as _
 		}
 	}
 
+	/// Get the sample rate in Hertz.
 	pub fn sample_rate(&self) -> i32 {
 		unsafe {
 			(*self.outstream).sample_rate as _
 		}
 	}
 
-	// Can only be called from the write_callback context. This includes both hardware and software latency.
 	/// Obtain the total number of seconds that the next frame written after the
-	/// last frame written with ::soundio_outstream_end_write will take to become
+	/// last frame written from the write callback will take to become
 	/// audible. This includes both software and hardware latency. In other words,
-	/// if you call this function directly after calling ::soundio_outstream_end_write,
+	/// if you call this function directly after dropping the `OutStreamWriter`,
 	/// this gives you the number of seconds that the next frame written will take
 	/// to become audible.
 	///
-	/// This function must be called only from within SoundIoOutStream::write_callback.
+	/// # Errors
 	///
-	/// Possible errors:
-	/// * #SoundIoErrorStreaming
+	/// * `Error::Streaming`
+	///
 	pub fn get_latency(&mut self) -> Result<f64> {
 		let mut x: c_double = 0.0;
 		match unsafe { raw::soundio_outstream_get_latency(self.outstream, &mut x as *mut c_double) } {
@@ -350,109 +365,78 @@ impl<'a> OutStreamWriter<'a> {
 		}
 	}
 
-	/// Set the value of a sample/channel. Panics if out of range or the wrong sized type (in debug builds).
-	pub fn set_sample_typed<T: Copy>(&mut self, channel: usize, frame: usize, sample: T) {
+	/// Set the value of a sample/channel. This panics if the `channel` or `frame` are
+	/// out of range or if you haven't called `begin_write()` yet.
+	///
+	/// If you use a different type from the actual one it will be converted.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// fn write_callback(&mut self, stream: &mut soundio::OutStreamWriter) {
+	///     let frame_count_max = stream.frame_count_max();
+	///     stream.begin_write(frame_count_max).unwrap();
+	///     for c in 0..stream.channel_count() {
+	///         for f in 0..stream.frame_count() {
+	///             stream.set_sample::<f32>(c, f, 0.0 as f32);
+	///         }
+	///     }
+	/// }
+	/// ```
+	pub fn set_sample<T: Sample>(&mut self, channel: usize, frame: usize, sample: T) {
 		assert!(self.write_started);
-
-		// Check format is at least the right size. This is only done in debug builds for speed reasons.
-		debug_assert_eq!(mem::size_of::<T>(), Format::from(unsafe { (*self.outstream).format }).bytes_per_sample());
-
-		// TODO: Maybe actually we should just automatically convert it to the right type if it isn't already.
 
 		assert!(channel < self.channel_count(), "Channel out of range");
 		assert!(frame < self.frame_count(), "Frame out of range");
 
 		unsafe {
-			let ptr = self.channel_areas[channel].ptr.offset((frame * self.channel_areas[channel].step as usize) as isize) as *mut T;
-			*ptr = sample;
+			let ptr = self.channel_areas[channel].ptr.offset((frame * self.channel_areas[channel].step as usize) as isize) as *mut u8;
+
+			match (*self.outstream).format {
+				raw::SoundIoFormat::SoundIoFormatS8 => i8::to_raw_le(T::to_i8(sample), ptr),
+				raw::SoundIoFormat::SoundIoFormatU8 => u8::to_raw_le(T::to_u8(sample), ptr),
+				raw::SoundIoFormat::SoundIoFormatS16LE => i16::to_raw_le(T::to_i16(sample), ptr),
+				raw::SoundIoFormat::SoundIoFormatS16BE => i16::to_raw_be(T::to_i16(sample), ptr),
+				raw::SoundIoFormat::SoundIoFormatU16LE => u16::to_raw_le(T::to_u16(sample), ptr),
+				raw::SoundIoFormat::SoundIoFormatU16BE => u16::to_raw_be(T::to_u16(sample), ptr),
+				raw::SoundIoFormat::SoundIoFormatS24LE => i24::to_raw_le(T::to_i24(sample), ptr),
+				raw::SoundIoFormat::SoundIoFormatS24BE => i24::to_raw_be(T::to_i24(sample), ptr),
+				raw::SoundIoFormat::SoundIoFormatU24LE => u24::to_raw_le(T::to_u24(sample), ptr),
+				raw::SoundIoFormat::SoundIoFormatU24BE => u24::to_raw_be(T::to_u24(sample), ptr),
+				raw::SoundIoFormat::SoundIoFormatS32LE => i32::to_raw_le(T::to_i32(sample), ptr),
+				raw::SoundIoFormat::SoundIoFormatS32BE => i32::to_raw_be(T::to_i32(sample), ptr),
+				raw::SoundIoFormat::SoundIoFormatU32LE => u32::to_raw_le(T::to_u32(sample), ptr),
+				raw::SoundIoFormat::SoundIoFormatU32BE => u32::to_raw_be(T::to_u32(sample), ptr),
+				raw::SoundIoFormat::SoundIoFormatFloat32LE => f32::to_raw_le(T::to_f32(sample), ptr),
+				raw::SoundIoFormat::SoundIoFormatFloat32BE => f32::to_raw_be(T::to_f32(sample), ptr),
+				raw::SoundIoFormat::SoundIoFormatFloat64LE => f64::to_raw_le(T::to_f64(sample), ptr),
+				raw::SoundIoFormat::SoundIoFormatFloat64BE => f64::to_raw_be(T::to_f64(sample), ptr),
+				_ => panic!("Unknown format"),			
+			}
 		}
 	}
 
-	/// Get the value of a sample/channel. Panics if out of range or the wrong sized type (in debug builds).
-	pub fn sample_typed<T: Copy>(&self, channel: usize, frame: usize) -> T {
-		assert!(self.write_started);
-
-		// Check format is at least the right size. This is only done in debug builds for speed reasons.
-		debug_assert_eq!(mem::size_of::<T>(), Format::from(unsafe { (*self.outstream).format }).bytes_per_sample());
-
-		assert!(channel < self.channel_count(), "Channel out of range");
-		assert!(frame < self.frame_count(), "Frame out of range");
-
-		unsafe {
-			let ptr = self.channel_areas[channel].ptr.offset((frame * self.channel_areas[channel].step as usize) as isize) as *mut T;
-			*ptr
-		}
-	}
-
-	// Set the value of a sample/channel and coerces it to the correct type. Panics if out of range.
-/*	pub fn set_sample<T: CastF64>(&mut self, channel: usize, frame: usize, sample: T) {
-		match unsafe { (*self.outstream).format } {
-			// TODO: Hmm but now I'd have to remap the ranges too...
-			// Maybe I'll just omit this for now.
-			raw::SoundIoFormat::SoundIoFormatS8 => self.set_sample_typed::<i8>(channel, frame, sample.from_f64()),
-			raw::SoundIoFormat::SoundIoFormatU8 => self.set_sample_typed::<u8>(channel, frame, sample.from_f64()),
-			raw::SoundIoFormat::SoundIoFormatS16LE => self.set_sample_typed::<i16>(channel, frame, sample.from_f64()),
-			raw::SoundIoFormat::SoundIoFormatS16BE => self.set_sample_typed::<i16>(channel, frame, sample.from_f64()),
-			raw::SoundIoFormat::SoundIoFormatU16LE => self.set_sample_typed::<u16>(channel, frame, sample.from_f64()),
-			raw::SoundIoFormat::SoundIoFormatU16BE => self.set_sample_typed::<u16>(channel, frame, sample.from_f64()),
-			raw::SoundIoFormat::SoundIoFormatS24LE => self.set_sample_typed::<i32>(channel, frame, sample.from_f64()),
-			raw::SoundIoFormat::SoundIoFormatS24BE => self.set_sample_typed::<i32>(channel, frame, sample.from_f64()),
-			raw::SoundIoFormat::SoundIoFormatU24LE => self.set_sample_typed::<u32>(channel, frame, sample.from_f64()),
-			raw::SoundIoFormat::SoundIoFormatU24BE => self.set_sample_typed::<u32>(channel, frame, sample.from_f64()),
-			raw::SoundIoFormat::SoundIoFormatS32LE => self.set_sample_typed::<i32>(channel, frame, sample.from_f64()),
-			raw::SoundIoFormat::SoundIoFormatS32BE => self.set_sample_typed::<i32>(channel, frame, sample.from_f64()),
-			raw::SoundIoFormat::SoundIoFormatU32LE => self.set_sample_typed::<u32>(channel, frame, sample.from_f64()),
-			raw::SoundIoFormat::SoundIoFormatU32BE => self.set_sample_typed::<u32>(channel, frame, sample.from_f64()),
-			raw::SoundIoFormat::SoundIoFormatFloat32LE => self.set_sample_typed::<f32>(channel, frame, sample.from_f64()),
-			raw::SoundIoFormat::SoundIoFormatFloat32BE => self.set_sample_typed::<f64>(channel, frame, sample.from_f64()),
-			raw::SoundIoFormat::SoundIoFormatFloat64LE => self.set_sample_typed::<f32>(channel, frame, sample.from_f64()),
-			raw::SoundIoFormat::SoundIoFormatFloat64BE => self.set_sample_typed::<f64>(channel, frame, sample.from_f64()),
-			_ => panic!("Unknown format"),			
-		}
-	}*/
-
-	// Get the value of a sample/channel as an f64. Panics if out of range.
-	// pub fn sample<T: CastF64>(&self, channel: usize, frame: usize) -> T {
-	// 	match unsafe { (*self.outstream).format } {
-	// 		raw::SoundIoFormat::SoundIoFormatS8 => self.sample_typed::<i8>(channel, frame).from_f?(),
-	/*		raw::SoundIoFormat::SoundIoFormatU8 => Format::U8,
-			raw::SoundIoFormat::SoundIoFormatS16LE => Format::S16LE,
-			raw::SoundIoFormat::SoundIoFormatS16BE => Format::S16BE,
-			raw::SoundIoFormat::SoundIoFormatU16LE => Format::U16LE,
-			raw::SoundIoFormat::SoundIoFormatU16BE => Format::U16BE,
-			raw::SoundIoFormat::SoundIoFormatS24LE => Format::S24LE,
-			raw::SoundIoFormat::SoundIoFormatS24BE => Format::S24BE,
-			raw::SoundIoFormat::SoundIoFormatU24LE => Format::U24LE,
-			raw::SoundIoFormat::SoundIoFormatU24BE => Format::U24BE,
-			raw::SoundIoFormat::SoundIoFormatS32LE => Format::S32LE,
-			raw::SoundIoFormat::SoundIoFormatS32BE => Format::S32BE,
-			raw::SoundIoFormat::SoundIoFormatU32LE => Format::U32LE,
-			raw::SoundIoFormat::SoundIoFormatU32BE => Format::U32BE,
-			raw::SoundIoFormat::SoundIoFormatFloat32LE => Format::Float32LE,
-			raw::SoundIoFormat::SoundIoFormatFloat32BE => Format::Float32BE,
-			raw::SoundIoFormat::SoundIoFormatFloat64LE => Format::Float64LE,
-			raw::SoundIoFormat::SoundIoFormatFloat64BE => Format::Float64BE,*/
-		// 	_ => panic!("Unknown format"),			
-		// }
-	// }
+	// TODO: To acheive speed *and* safety I can use iterators. That will be in a future API.
 }
 
 impl<'a> Drop for OutStreamWriter<'a> {
-	/// Commits the write that you began with ::soundio_outstream_begin_write.
-	/// You must call this function only from the SoundIoOutStream::write_callback thread context.
+	/// Commits the write that you began with `begin_write()`.
 	///
-	/// Possible errors:
-	/// * #SoundIoErrorStreaming
-	/// * #SoundIoErrorUnderflow - an underflow caused this call to fail. You might
-	///   also get a SoundIoOutStream::underflow_callback, and you might not get
-	///   this error code when an underflow occurs. Unlike #SoundIoErrorStreaming,
+	/// Errors are currently are just printed to the console and ignored.
+	///
+	/// # Errors
+	///
+	/// * `Error::Streaming`
+	/// * `Error::Underflow` - an underflow caused this call to fail. You might
+	///   also get an `underflow_callback()`, and you might not get
+	///   this error code when an underflow occurs. Unlike `Error::Streaming`,
 	///   the outstream is still in a valid state and streaming can continue.
 	fn drop(&mut self) {
 		if self.write_started {
 			unsafe {
 				match raw::soundio_outstream_end_write(self.outstream) {
 					0 => {},
-					x => panic!("Error writing outstream: {}", Error::from(x)),
+					x => println!("Error writing outstream: {}", Error::from(x)),
 				}
 			}
 		}

@@ -154,6 +154,7 @@ mod error;
 mod channels;
 mod backend;
 mod format;
+mod sample;
 
 // Currently I export everything, including things that should be
 // private. When `pub(crate)` arrives I will change this.
@@ -168,6 +169,7 @@ pub use self::error::*;
 pub use self::channels::*;
 pub use self::backend::*;
 pub use self::format::*;
+pub use self::sample::*;
 
 /// Return the libsoundio version string, for example `"1.0.2"`.
 ///

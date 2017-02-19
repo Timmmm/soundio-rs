@@ -274,35 +274,3 @@ impl fmt::Display for Format {
 		f.write_str(c_str.to_str().unwrap())
 	}
 }
-
-/// This is a trait for types that can be cast to or from an f64.
-///
-/// It is implemented for all the primitive numeric types: `u8`, `u16`, `u32`, `u64`,
-/// `usize`, `i8`, `i16`, `i32`, `i64`, `isize`, `f32` and `f64`.
-pub trait CastF64 {
-	/// Cast the type from an f64. 
-	fn from_f64(v: f64) -> Self;
-	/// Cast the type to an f64.
-	fn to_f64(v: Self) -> f64;
-}
-
-macro_rules! impl_cast_f64 {
-	($($ty:ty)*) => {
-		$(
-			impl CastF64 for $ty {
-				#[inline]
-				fn from_f64(v: f64) -> $ty {
-					v as $ty
-				}
-
-				#[inline]
-				fn to_f64(v: $ty) -> f64 {
-					v as f64
-				}
-			}
-		)*
-	}
-}
-
-impl_cast_f64!(u8 u16 u32 u64 usize i8 i16 i32 i64 isize f32 f64);
-
