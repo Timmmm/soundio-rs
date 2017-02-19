@@ -58,13 +58,13 @@ impl<'a> Device<'a> {
 	/// # Examples
 	///
 	/// ```
-	/// let mut ctx = Context::new();
-	/// ctx.connect_backend(Backend::Dummy).unwrap();
-	/// for dev in ctx.input_devices() {
-	///     assert_eq!(dev.aim(), DeviceAim::Input);
+	/// let mut ctx = soundio::Context::new();
+	/// ctx.connect_backend(soundio::Backend::Dummy).expect("Couldn't connect to backend");
+	/// for dev in ctx.input_devices().expect("Couldn't get input devices") {
+	///     assert_eq!(dev.aim(), soundio::DeviceAim::Input);
 	/// }
-	/// for dev in ctx.output_devices() {
-	///     assert_eq!(dev.aim(), DeviceAim::Output);
+	/// for dev in ctx.output_devices().expect("Couldn't get output devices") {
+	///     assert_eq!(dev.aim(), soundio::DeviceAim::Output);
 	/// }
 	/// ```
 	pub fn aim(&self) -> DeviceAim {
@@ -139,9 +139,9 @@ impl<'a> Device<'a> {
 	/// # Examples
 	///
 	/// ```
-	/// let mut ctx = Context::new();
-	/// ctx.connect_backend(Backend::Dummy).unwrap();
-	/// let out_dev = ctx.default_output_device();
+	/// let mut ctx = soundio::Context::new();
+	/// ctx.connect_backend(soundio::Backend::Dummy).expect("Couldn't connect to backend");
+	/// let out_dev = ctx.default_output_device().expect("Couldn't open default output");
 	/// for rate in out_dev.sample_rates() {
 	///     println!("Sample rate min: {} max {}", rate.min, rate.max);
 	/// }
@@ -210,10 +210,10 @@ impl<'a> Device<'a> {
 	/// # Examples
 	///
 	/// ```
-	/// let mut ctx = Context::new();
-	/// ctx.connect_backend(Backend::Dummy).unwrap();
-	/// let out_dev = ctx.default_output_device();
-	/// println!("Default output device {} unsigned 16 bit little endian", if out_dev.supports_format(Format::S16LE) { "supports" } else { "doesn't support" });
+	/// let mut ctx = soundio::Context::new();
+	/// ctx.connect_backend(soundio::Backend::Dummy).expect("Couldn't connect to backend");
+	/// let out_dev = ctx.default_output_device().expect("Couldn't open default output");
+	/// println!("Default output device {} unsigned 16 bit little endian", if out_dev.supports_format(soundio::Format::S16LE) { "supports" } else { "doesn't support" });
 	/// ```
 	pub fn supports_format(&self, format: Format) -> bool {
 		unsafe {
@@ -226,12 +226,12 @@ impl<'a> Device<'a> {
 	/// # Examples
 	///
 	/// ```
-	/// let mut ctx = Context::new();
-	/// ctx.connect_backend(Backend::Dummy).unwrap();
-	/// let out_dev = ctx.default_output_device();
-	/// println!("Default output device {} stereo", if out_dev.supports_layout(ChannelLayout::get_builtin(ChannelLayoutId::Stereo)) { "supports" } else { "doesn't support" });
+	/// let mut ctx = soundio::Context::new();
+	/// ctx.connect_backend(soundio::Backend::Dummy).expect("Couldn't connect to backend");
+	/// let out_dev = ctx.default_output_device().expect("Couldn't open default output");
+	/// println!("Default output device {} stereo", if out_dev.supports_layout(soundio::ChannelLayout::get_builtin(soundio::ChannelLayoutId::Stereo)) { "supports" } else { "doesn't support" });
 	/// ```
-	pub fn supports_layout(&mut self, layout: ChannelLayout) -> bool {
+	pub fn supports_layout(&self, layout: ChannelLayout) -> bool {
 		unsafe {
 			raw::soundio_device_supports_layout(self.device, &layout.into() as *const _) != 0
 		}
@@ -242,9 +242,9 @@ impl<'a> Device<'a> {
 	/// # Examples
 	///
 	/// ```
-	/// let mut ctx = Context::new();
-	/// ctx.connect_backend(Backend::Dummy).unwrap();
-	/// let out_dev = ctx.default_output_device();
+	/// let mut ctx = soundio::Context::new();
+	/// ctx.connect_backend(soundio::Backend::Dummy).expect("Couldn't connect to backend");
+	/// let out_dev = ctx.default_output_device().expect("Couldn't open default output");
 	/// println!("Default output device {} 44.1 kHz", if out_dev.supports_sample_rate(44100) { "supports" } else { "doesn't support" });
 	/// ```
 	pub fn supports_sample_rate(&self, sample_rate: i32) -> bool {
@@ -259,9 +259,9 @@ impl<'a> Device<'a> {
 	/// # Examples
 	///
 	/// ```
-	/// let mut ctx = Context::new();
-	/// ctx.connect_backend(Backend::Dummy).unwrap();
-	/// let out_dev = ctx.default_output_device();
+	/// let mut ctx = soundio::Context::new();
+	/// ctx.connect_backend(soundio::Backend::Dummy).expect("Couldn't connect to backend");
+	/// let out_dev = ctx.default_output_device().expect("Couldn't open default output");
 	/// println!("Nearest sample rate to 44000: {}", out_dev.nearest_sample_rate(44000));
 	/// ```
 	pub fn nearest_sample_rate(&self, sample_rate: i32) -> i32 {

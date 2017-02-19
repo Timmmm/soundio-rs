@@ -11,9 +11,10 @@ use std::fmt;
 /// # Examples
 ///
 /// ```
+/// # use soundio::*;
 /// println!("Layout: {}", ChannelId::FrontLeftCenter);
 ///
-/// assert_eq!(format!("{}", ChannelId::MsMid), ""Mid/Side Mid");
+/// assert_eq!(format!("{}", ChannelId::MsMid), "Mid/Side Mid");
 /// ```
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ChannelId {
@@ -270,10 +271,11 @@ impl ChannelId {
 	/// # Examples
 	///
 	/// ```
+	/// # use soundio::*;
 	/// assert_eq!(ChannelId::parse("Front Left Center"), Some(ChannelId::FrontLeftCenter));
 	/// assert_eq!(ChannelId::parse("FLC"), Some(ChannelId::FrontLeftCenter));
 	/// assert_eq!(ChannelId::parse("front-left-of-center"), Some(ChannelId::FrontLeftCenter));
-	/// assert_eq!(ChannelId::parse("Shot is the best!"), None));
+	/// assert_eq!(ChannelId::parse("Shot is the best!"), None);
 	/// ```
 	pub fn parse(id: &str) -> Option<ChannelId> {
 		match unsafe { raw::soundio_parse_channel_id(id.as_ptr() as _, id.len() as _) } {

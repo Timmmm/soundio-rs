@@ -47,6 +47,7 @@ pub enum Format {
 }
 
 /// This is a small helper type to find the endianness of a sample format.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Endian {
 	Big,
 	Little,
@@ -58,9 +59,10 @@ pub enum Endian {
 /// # Examples
 ///
 /// ```
-/// assert_eq!(endianness(Format::S24LE, Endian::Little);
-/// assert_eq!(endianness(Format::U8, Endian::Little);
-/// assert_eq!(endianness(Format::Float64BE, Endian::Big);
+/// use soundio::*;
+/// assert_eq!(endianness(Format::S24LE), Endian::Little);
+/// assert_eq!(endianness(Format::U8), Endian::Little);
+/// assert_eq!(endianness(Format::Float64BE), Endian::Big);
 /// ```
 pub fn endianness(f: Format) -> Endian {
 	match f {
@@ -231,8 +233,10 @@ impl Format {
 	/// # Examples
 	///
 	/// ```
-	/// assert_eq!(Format::S8.bytes_per_sample(), 1);
-	/// assert_eq!(Format::Float64LE.bytes_per_frame(), 8);
+	/// let a = soundio::Format::S8;
+	/// assert_eq!(a.bytes_per_sample(), 1);
+	/// let b = soundio::Format::Float64LE;
+	/// assert_eq!(b.bytes_per_sample(), 8);
 	/// ```
 	pub fn bytes_per_sample(&self) -> usize {
 		unsafe { raw::soundio_get_bytes_per_sample((*self).into()) as usize }
@@ -245,8 +249,10 @@ impl Format {
 	/// # Examples
 	///
 	/// ```
-	/// assert_eq!(Format::S8.bytes_per_frame(2), 2);
-	/// assert_eq!(Format::Float64LE.bytes_per_frame(4), 32);
+	/// let a = soundio::Format::S8;
+	/// assert_eq!(a.bytes_per_frame(2), 2);
+	/// let b = soundio::Format::Float64LE;
+	/// assert_eq!(b.bytes_per_frame(4), 32);
 	/// ```
 	pub fn bytes_per_frame(&self, channel_count: usize) -> usize {
 		self.bytes_per_sample() * channel_count
@@ -258,8 +264,10 @@ impl Format {
 	/// # Examples
 	///
 	/// ```
-	/// assert_eq!(Format::S8.bytes_per_second(2, 8000), 16000);
-	/// assert_eq!(Format::Float64LE.bytes_per_frame(4, 4000), 128000);
+	/// let a = soundio::Format::S8;
+	/// assert_eq!(a.bytes_per_second(2, 8000), 16000);
+	/// let b = soundio::Format::Float64LE;
+	/// assert_eq!(b.bytes_per_second(4, 4000), 128000);
 	/// ```
 	pub fn bytes_per_second(&self, channel_count: usize, sample_rate: usize) -> usize {
 		self.bytes_per_sample() * channel_count * sample_rate

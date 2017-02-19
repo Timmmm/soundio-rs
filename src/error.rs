@@ -14,7 +14,8 @@ use std::os::raw::c_int;
 /// # Examples
 ///
 /// ```
-/// let e = Error::IncompatibleDevice;
+/// use std::error::Error;
+/// let e = soundio::Error::IncompatibleDevice;
 /// println!("{}", e.description());
 /// ```
 #[derive(Debug, Copy, Clone)]

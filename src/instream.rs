@@ -323,15 +323,16 @@ impl<'a> InStreamReader<'a> {
 	/// # Examples
 	///
 	/// ```
-	/// fn read_callback(&mut self, stream: &mut soundio::OutStreamWriter) {
+	/// fn read_callback(stream: &mut soundio::InStreamReader) {
 	///     let frame_count_max = stream.frame_count_max();
 	///     stream.begin_read(frame_count_max).unwrap();
 	///     for c in 0..stream.channel_count() {
 	///         for f in 0..stream.frame_count() {
-	///             do_something_with(stream.sample::<i16>(c, f);
+	///             do_something_with(stream.sample::<i16>(c, f));
 	///         }
 	///     }
 	/// }
+	/// # fn do_something_with(_: i16) { }
 	/// ```
 	pub fn sample<T: Sample>(&self, channel: usize, frame: usize) -> T {
 		assert!(self.read_started);

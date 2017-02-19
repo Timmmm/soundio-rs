@@ -14,9 +14,9 @@ use std::cmp::min;
 /// For example, the built-in stereo layout that is returned by `ChannelLayout::get_builtin(`ChannelLayoutId::Stereo)` is equal to:
 ///
 /// ```
-/// ChannelLayout {
+/// soundio::ChannelLayout {
 /// 	name: "Stereo".to_string(),
-/// 	channels: vec![ChannelId::FrontLeft, ChannelId::FrontRight],
+/// 	channels: vec![soundio::ChannelId::FrontLeft, soundio::ChannelId::FrontRight],
 /// };
 /// ```
 #[derive(Debug, Clone)]
@@ -62,8 +62,8 @@ impl ChannelLayout {
 	/// # Examples
 	///
 	/// ```
-	/// let builtins = ChannelLayout::get_all_builtin();
-	/// println!("{?:}", builtins);
+	/// let builtins = soundio::ChannelLayout::get_all_builtin();
+	/// println!("{:?}", builtins);
 	/// ```
 	pub fn get_all_builtin() -> Vec<ChannelLayout> {
 		let count = unsafe { raw::soundio_channel_layout_builtin_count() };
@@ -80,7 +80,7 @@ impl ChannelLayout {
 	/// # Examples
 	///
 	/// ```
-	/// let stereo_layout = ChannelLayout::get_builtin(ChannelLayoutId::Stereo);
+	/// let stereo_layout = soundio::ChannelLayout::get_builtin(soundio::ChannelLayoutId::Stereo);
 	/// assert_eq!(stereo_layout.channels.len(), 2);
 	/// ```
 	pub fn get_builtin(id: ChannelLayoutId) -> ChannelLayout {
@@ -96,7 +96,7 @@ impl ChannelLayout {
 	/// # Examples
 	///
 	/// ```
-	/// let default_stereo = ChannelLayout::get_default(2);
+	/// let default_stereo = soundio::ChannelLayout::get_default(2);
 	/// assert_eq!(default_stereo.name, "Stereo".to_string());
 	/// ```
 	pub fn get_default(channel_count: i32) -> ChannelLayout {
@@ -139,9 +139,9 @@ impl ChannelLayout {
 	/// # Examples
 	///
 	/// ```
-	/// let layout = ChannelLayout::get_builtin(ChannelLayoutId::Stereo);
-	/// let left_idx = layout.find_channel(ChannelId::Left);
-	/// let center_idx = layout.find_channel(ChannelId::Center);
+	/// let layout = soundio::ChannelLayout::get_builtin(soundio::ChannelLayoutId::Stereo);
+	/// let left_idx = layout.find_channel(soundio::ChannelId::FrontLeft);
+	/// let center_idx = layout.find_channel(soundio::ChannelId::FrontCenter);
 	///
 	/// assert_eq!(left_idx, Some(0));
 	/// assert_eq!(center_idx, None);
@@ -157,9 +157,9 @@ impl ChannelLayout {
 	/// # Examples
 	///
 	/// ```
-	/// let layout = ChannelLayout {
+	/// let mut layout = soundio::ChannelLayout {
 	///     name: "".to_string(),
-	///     channels: vec![ChannelId::Left, ChannelId::Right],
+	///     channels: vec![soundio::ChannelId::FrontLeft, soundio::ChannelId::FrontRight],
 	/// };
 	/// 
 	/// assert_eq!(layout.detect_builtin(), true);
@@ -181,9 +181,9 @@ impl ChannelLayout {
 	/// # Examples
 	///
 	/// ```
-	/// let mut layouts = ChannelLayout::get_all_builtin();
+	/// let mut layouts = soundio::ChannelLayout::get_all_builtin();
 	/// 
-	/// ChannelLayout::sort(&mut layouts);
+	/// soundio::ChannelLayout::sort(&mut layouts);
 	/// 
 	/// for i in 0..layouts.len()-1 {
 	///     assert!(layouts[i+1].channels.len() >= layouts[i].channels.len());
@@ -201,13 +201,13 @@ impl ChannelLayout {
 /// # Examples
 ///
 /// ```
-/// let layout_a = ChannelLayout {
+/// let layout_a = soundio::ChannelLayout {
 ///     name: "unimportant".to_string(),
-///     channels: vec![ChannelId::Left, ChannelId::Right],
+///     channels: vec![soundio::ChannelId::FrontLeft, soundio::ChannelId::FrontRight],
 /// };
-/// let layout_b = ChannelLayout {
+/// let layout_b = soundio::ChannelLayout {
 ///     name: "doesn't matter".to_string(),
-///     channels: vec![ChannelId::Left, ChannelId::Right],
+///     channels: vec![soundio::ChannelId::FrontLeft, soundio::ChannelId::FrontRight],
 /// };
 ///
 /// assert_eq!(layout_a, layout_b);

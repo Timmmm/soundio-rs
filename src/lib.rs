@@ -12,7 +12,7 @@
 //! First you must create a new instance of the library using `Context::new()` as follows.
 //!
 //! ```
-//! let ctx = Context::new();
+//! let ctx = soundio::Context::new();
 //! ```
 //!
 //! This will never fail except for out-of-memory situations in which case it panics (this is
@@ -22,7 +22,7 @@
 //! thing is to leave it unspecified, in which case they are all tried in order. You can also
 //! set the name of the app if you like.
 //!
-//! ```
+//! ```rust,ignore
 //! ctx.set_app_name("Player");
 //! ctx.connect()?;
 //! ```
@@ -31,13 +31,17 @@
 //! However before you can open any devices you must flush events like this.
 //!
 //! ```
+//! # let mut ctx = soundio::Context::new();
+//! # ctx.connect_backend(soundio::Backend::Dummy).unwrap();
 //! ctx.flush_events();
 //! ```
 //!
 //! The simplest way to open a device is to just open the default input or output device as follows.
 //!
 //! ```
-//! let dev = ctx.default_input_device()?;
+//! # let mut ctx = soundio::Context::new();
+//! # ctx.connect_backend(soundio::Backend::Dummy).unwrap();
+//! let dev = ctx.default_input_device().expect("No input device");
 //! ```
 //! 
 //! However *please* don't only use that option. Your users will hate you when they have to work out
@@ -49,15 +53,23 @@
 //! Onces the device has been opened, you can query it for supported formats and sample rates.
 //!
 //! ```
-//! if !dev.supports_layout(ChannelLayout::get_builtin(ChannelLayoutId::Stereo)) {
+//! # fn foo() -> Result<(), String> {
+//! # let mut ctx = soundio::Context::new();
+//! # ctx.connect_backend(soundio::Backend::Dummy).unwrap();
+//! # let dev = ctx.default_input_device()?;
+//! #
+//! if !dev.supports_layout(soundio::ChannelLayout::get_builtin(soundio::ChannelLayoutId::Stereo)) {
 //!     return Err("Device doesn't support stereo".to_string());
 //! }
-//! if !dev.supports_format(Format::S16LE) {
+//! if !dev.supports_format(soundio::Format::S16LE) {
 //!     return Err("Device doesn't support S16LE".to_string());
 //! }
-//! if !dev.supports_sample_rate(44100)) {
+//! if !dev.supports_sample_rate(44100) {
 //!     return Err("Device doesn't 44.1 kHz".to_string());
 //! }
+//! #
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! If all is well we can open an input or output stream. You can only open an input stream on an input
@@ -69,18 +81,28 @@
 //! your callback is called.
 //!
 //! ```
+//! # fn foo() -> Result<(), String> {
+//! # let mut ctx = soundio::Context::new();
+//! # ctx.connect_backend(soundio::Backend::Dummy).unwrap();
+//! # let dev = ctx.default_input_device()?;
+//! #
 //! let mut input_stream = dev.open_instream(
 //!     44100,
-//!     Format::S16LE,
-//!     ChannelLayout::get_builtin(ChannelLayoutId::Stereo),
+//!     soundio::Format::S16LE,
+//!     soundio::ChannelLayout::get_builtin(soundio::ChannelLayoutId::Stereo),
 //!     2.0,
-//!     read_callback
+//!     read_callback,
 //!     None::<fn()>,
 //!     None::<fn(soundio::Error)>,
 //! )?;
+//! #
+//! # Ok(())
+//! # }
+//! #
+//! # fn read_callback(stream: &mut soundio::InStreamReader) { }
 //! ```
 //!
-//! `my_callback` is a callback that takes an `InStreamReader` or `OutStreamWriter`, something like this.
+//! `read_callback` is a callback that takes an `InStreamReader` or `OutStreamWriter`, something like this.
 //!
 //! ```
 //! fn read_callback(stream: &mut soundio::InStreamReader) {
@@ -92,10 +114,11 @@
 //!    
 //!     for f in 0..stream.frame_count() {
 //!         for c in 0..stream.channel_count() {
-//!             do_something_with(stream.sample_typed::<i16>(c, f));
+//!             do_something_with(stream.sample::<i16>(c, f));
 //!         }
 //!     }
 //! }
+//! # fn do_something_with(_: i16) { }
 //! ```
 //!
 //! In memory samples are stored LRLRLRLR rather than LLLLRRRR so for optimisation purposes it is
@@ -104,7 +127,7 @@
 //!
 //! Finally call `InStream::start()` to start your stream.
 //!
-//! ```
+//! ```rust,ignore
 //! input_stream.start()?;
 //! ```
 //!

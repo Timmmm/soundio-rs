@@ -21,7 +21,9 @@ use std::os::raw::c_char;
 /// # Examples
 ///
 /// ```
-/// assert_eq!(latin1_to_string(unsafe { "£µ±«\0".chars().map(|c| c as c_char).collect().as_ptr() }), "£µ±«")
+/// use std::os::raw::c_char;
+/// let latin1: Vec<c_char> = "£µ±«\0".chars().map(|c| c as c_char).collect();
+/// assert_eq!(soundio::latin1_to_string(latin1.as_ptr()), "£µ±«")
 /// ```
 pub fn latin1_to_string(s: *const c_char) -> String {
 	if s == ptr::null() {

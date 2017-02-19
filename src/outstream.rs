@@ -373,7 +373,7 @@ impl<'a> OutStreamWriter<'a> {
 	/// # Examples
 	///
 	/// ```
-	/// fn write_callback(&mut self, stream: &mut soundio::OutStreamWriter) {
+	/// fn write_callback(stream: &mut soundio::OutStreamWriter) {
 	///     let frame_count_max = stream.frame_count_max();
 	///     stream.begin_write(frame_count_max).unwrap();
 	///     for c in 0..stream.channel_count() {

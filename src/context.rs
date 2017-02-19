@@ -180,13 +180,12 @@ impl<'a> Context<'a> {
 	/// # Examples
 	///
 	/// ```
-	///
-	/// let backend_disconnect_callback = || { println!("Backend disconnected!"); };
+	/// let backend_disconnect_callback = |err| { println!("Backend disconnected: {}", err); };
 	///
 	/// let mut ctx = soundio::Context::new_with_callbacks(
-	///     Some(backend_disconnected_callback),
-	///     None,
-	///     None,
+	///     Some(backend_disconnect_callback),
+	///     None::<fn()>,
+	///     None::<fn()>,
 	/// );
 	/// ```
 	pub fn new_with_callbacks<BackendDisconnectCB, DevicesChangeCB, EventsSignalCB> (
@@ -229,10 +228,11 @@ impl<'a> Context<'a> {
 	}
 
 	/// Get the app name previously set by `set_app_name()`.
+	/// The default is "SoundIo".
 	///
 	/// ```
 	/// let mut ctx = soundio::Context::new();
-	/// assert_eq!(ctx.app_name(), "");
+	/// assert_eq!(ctx.app_name(), "SoundIo");
 	/// ctx.set_app_name(":::My App:::");
 	/// assert_eq!(ctx.app_name(), "My App");
 	/// ```
@@ -432,10 +432,10 @@ impl<'a> Context<'a> {
 	///
 	/// ```
 	/// let mut ctx = soundio::Context::new();
-	/// ctx.connect()?;
+	/// ctx.connect_backend(soundio::Backend::Dummy).expect("Couldn't connect to backend");
 	/// ctx.flush_events();
 	/// for i in 0..ctx.input_device_count() {
-	///     let dev = ctx.input_device(i)?;
+	///     let dev = ctx.input_device(i).expect("Error opening device");
 	///     println!("Device {} is called {}", i, dev.name());
 	/// }
 	/// ```
@@ -470,10 +470,10 @@ impl<'a> Context<'a> {
 	///
 	/// ```
 	/// let mut ctx = soundio::Context::new();
-	/// ctx.connect()?;
+	/// ctx.connect_backend(soundio::Backend::Dummy).expect("Couldn't connect to backend");
 	/// ctx.flush_events();
 	/// for i in 0..ctx.output_device_count() {
-	///     let dev = ctx.output_device(i)?;
+	///     let dev = ctx.output_device(i).expect("Error opening device");
 	///     println!("Device {} is called {}", i, dev.name());
 	/// }
 	/// ```
@@ -522,11 +522,11 @@ impl<'a> Context<'a> {
 	///
 	/// ```
 	/// let mut ctx = soundio::Context::new();
-	/// ctx.connect()?;
+	/// ctx.connect_backend(soundio::Backend::Dummy).expect("Couldn't connect to backend");
 	/// ctx.flush_events();
 	/// let default_input = ctx.default_input_device_index();
 	/// for i in 0..ctx.input_device_count() {
-	///     let dev = ctx.input_device(i)?;
+	///     let dev = ctx.input_device(i).expect("Error opening device");
 	///     println!("Device {} is called {}", i, dev.name());
 	///     if Some(i) == default_input {
 	///         println!("And it's the default!");
@@ -550,11 +550,11 @@ impl<'a> Context<'a> {
 	///
 	/// ```
 	/// let mut ctx = soundio::Context::new();
-	/// ctx.connect()?;
+	/// ctx.connect_backend(soundio::Backend::Dummy).expect("Couldn't connect to backend");
 	/// ctx.flush_events();
 	/// let default_output = ctx.default_output_device_index();
 	/// for i in 0..ctx.output_device_count() {
-	///     let dev = ctx.output_device(i)?;
+	///     let dev = ctx.output_device(i).expect("Error opening device");
 	///     println!("Device {} is called {}", i, dev.name());
 	///     if Some(i) == default_output {
 	///         println!("And it's the default!");
@@ -578,10 +578,10 @@ impl<'a> Context<'a> {
 	///
 	/// ```
 	/// let mut ctx = soundio::Context::new();
-	/// ctx.connect()?;
+	/// ctx.connect_backend(soundio::Backend::Dummy).expect("Couldn't connect to backend");
 	/// ctx.flush_events();
-	/// let devs = ctx.input_devices()?;
-	/// for dev in devs() {
+	/// let devs = ctx.input_devices().expect("Error getting devices");
+	/// for dev in devs {
 	///     println!("Device {} ", dev.name());
 	/// }
 	/// ```
@@ -603,10 +603,10 @@ impl<'a> Context<'a> {
 	///
 	/// ```
 	/// let mut ctx = soundio::Context::new();
-	/// ctx.connect()?;
+	/// ctx.connect_backend(soundio::Backend::Dummy).expect("Couldn't connect to backend");
 	/// ctx.flush_events();
-	/// let devs = ctx.output_devices()?;
-	/// for dev in devs() {
+	/// let devs = ctx.output_devices().expect("Error getting devices");
+	/// for dev in devs {
 	///     println!("Device {} ", dev.name());
 	/// }
 	/// ```
@@ -629,9 +629,9 @@ impl<'a> Context<'a> {
 	///
 	/// ```
 	/// let mut ctx = soundio::Context::new();
-	/// ctx.connect()?;
+	/// ctx.connect_backend(soundio::Backend::Dummy).expect("Couldn't connect to backend");
 	/// ctx.flush_events();
-	/// let dev = ctx.default_input_device()?;
+	/// let dev = ctx.default_input_device().expect("No default device");
 	/// println!("The default input device is {}", dev.name());
 	/// ```
 	pub fn default_input_device(&self) -> Result<Device> {
@@ -652,9 +652,9 @@ impl<'a> Context<'a> {
 	///
 	/// ```
 	/// let mut ctx = soundio::Context::new();
-	/// ctx.connect()?;
+	/// ctx.connect_backend(soundio::Backend::Dummy).expect("Couldn't connect to backend");
 	/// ctx.flush_events();
-	/// let dev = ctx.default_output_device()?;
+	/// let dev = ctx.default_output_device().expect("No default device");
 	/// println!("The default output device is {}", dev.name());
 	/// ```
 	pub fn default_output_device(&self) -> Result<Device> {
