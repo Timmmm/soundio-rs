@@ -1,6 +1,6 @@
 [package]
 name = "soundio"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Tim Hutt <tdhutt@gmail.com>"]
 license = "MIT"
 readme = "Readme.md"
@@ -11,6 +11,8 @@ documentation = "https://github.com/Timmmm/soundio-rs"
 description = """
 Bindings to libsoundio for audio input and output.
 """
+keywords = ["audio", "media", "soundio"]
+categories = ["multimedia", "multimedia::audio"]
 
 [dependencies]
 libc = "0.2"
@@ -33,3 +35,7 @@ path = "examples/list_devices/main.rs"
 [dev_dependencies]
 crossbeam = "0.2.10"
 hound = "3.0.0"
+
+[badges]
+travis-ci = { repository = "https://github.com/Timmmm/soundio-rs", branch = "master" }
+appveyor = { repository = "https://github.com/Timmmm/soundio-rs", branch = "master", service = "github" }

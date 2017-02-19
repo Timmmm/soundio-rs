@@ -1,12 +1,14 @@
 [package]
 name = "libsoundio-sys"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Tim Hutt <tdhutt@gmail.com>"]
 links = "soundio"
 build = "build.rs"
 repository = "https://github.com/Timmmm/soundio-rs"
 license = "MIT"
 description = "Native bindings to the libsoundio library"
+keywords = ["audio", "media", "soundio"]
+categories = ["multimedia", "multimedia::audio"]
 
 [lib]
 name = "libsoundio_sys"
@@ -19,3 +21,4 @@ libc = "0.2"
 pkg-config = "0.3"
 cmake = "0.1.2"
 gcc = "0.3"
+
