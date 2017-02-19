@@ -290,7 +290,7 @@ impl<'a> Device<'a> {
 	/// * `format` - The requested format. Check supported formats first with `Device::formats()`.
 	/// * `layout` - The requested channel layout. Check supported formats first with `Device::layouts()`.
 	/// * `latency` - The requested software latency in seconds. With a lower value your write callback will be called more often and work in smaller blocks but latency will be lower.
-	/// * `write_callback` - Required callback that is called to allow you to write audio data to the outstream.
+	/// * `write_callback` - Required callback that is called to allow you to write audio data to the outstream. See `OutStreamWriter` for more details.
 	/// * `underflow_callback` - Optional callback that is called when your `write_callback` is too slow and the output skips.
 	/// * `error_callback` - Optional error callback.
 	///
@@ -394,7 +394,7 @@ impl<'a> Device<'a> {
 	/// * `format` - The requested format. Check supported formats first with `Device::formats()`.
 	/// * `layout` - The requested channel layout. Check supported formats first with `Device::layouts()`.
 	/// * `latency` - The requested software latency in seconds. With a lower value your read callback will be called more often and work in smaller blocks but latency will be lower.
-	/// * `read_callback` - Required callback that is called to allow you to process audio data from the instream.
+	/// * `read_callback` - Required callback that is called to allow you to process audio data from the instream. See `InStreamReader` for more details.
 	/// * `overflow_callback` - Optional callback that is called when your `read_callback` is too slow and skips some input.
 	/// * `error_callback` - Optional error callback.
 	///
