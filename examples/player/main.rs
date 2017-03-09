@@ -8,6 +8,12 @@ use std::io::BufReader;
 use std::fs::File;
 use std::env;
 
+// Maybe the best way to do this is something like:
+//
+// let (write_callback, wav_player) = WavPlayer::new();
+//
+// Internally they can use a mutex to communicate.
+
 struct WavPlayer {
 	reader: hound::WavReader<BufReader<File>>,
 	finished: bool,
@@ -21,27 +27,25 @@ impl WavPlayer {
 			return;
 		}
 
-		let mut s = self.reader.samples();
+		// Hound's sample conversion is not as awesome as mine. This will fail on floating point types.
+		let mut s = self.reader.samples::<i32>();
 
-		// TODO: Not hard-code the format here. In fact it would be nice if we could choose the format at run-time... Or get it from a soundio::Format at compile time?
 		let was_finished = self.finished;
 
 		for f in 0..stream.frame_count() {
     		for c in 0..stream.channel_count() {
 				match s.next() {
 					Some(x) => {
-						stream.set_sample::<i16>(c, f, x.unwrap()); 
+						stream.set_sample(c, f, x.unwrap()); 
 					},
 					None => {
-						stream.set_sample::<i16>(c, f, 0);
+						stream.set_sample(c, f, 0);
 						self.finished = true;
 					}
 				}
 				
 			}
 		}
-		// TODO: When s.next() doesn't unwrap we need to stop playback by... maybe we can have a callback in WavPlayer when playback is finished.
-
 		if self.finished != was_finished {
 	//		stream.wakeup();
 		}
@@ -51,17 +55,14 @@ impl WavPlayer {
 		self.finished
 	}
 }
-// TODO: I need to implement Sync for WavPlayer so write_callback can be called from a different thread to finished().
-// TODO: I also need to use interior mutability so that write_callback() doesn't mutably borrow self. But it *does* mutate self. The problem is that
-// Rust doesn't know that it is safe to call the other functions while 
+
+// TODO: I need some interior mutability and a mutex to make the write_callback work nicely.
 
 // Print sound soundio debug info and play back a sound.
 fn play(filename: &str) -> Result<(), String> {
 	// Try to open the file.
 	let reader = hound::WavReader::open(filename).map_err(|x| x.to_string())?;
 	
-
-
 	println!("Soundio version: {}", soundio::version_string());
 
 	let mut ctx = soundio::Context::new();
@@ -116,7 +117,7 @@ fn play(filename: &str) -> Result<(), String> {
 		soundio_format,
 		default_layout,
 		2.0,
-		|x| player.write_callback(x), // The trouble is this borrows &mut player, so I can't use it at all elsewhere. It's correct because player can be mutated. But I still want to read a value of it.
+		|x| player.write_callback(x), // The trouble is this borrows &mut player, so I can't use it at all elsewhere. It's correct because player can be mutated. But I still want to read a value of it. The only solution is interior mutability.
 		None::<fn()>,
 		None::<fn(soundio::Error)>,
 	)?;
@@ -124,36 +125,12 @@ fn play(filename: &str) -> Result<(), String> {
 	println!("Starting stream");
 	output_stream.start()?;
 
-	let exit_loop = AtomicBool::new(false);
-	let exit_loop_ref = &exit_loop;
-
-
-	// Create a new thread scope...
-	crossbeam::scope(|scope| {
-
-
-		let ctx_ref = &ctx;
-
-		// Start a new scoped thread to wait for sound events (and for the player to be finished).
-        scope.spawn(move || {
-			while exit_loop_ref.load(Ordering::Relaxed) == false/* && !player.finished*/ {
-				ctx_ref.wait_events();
-			}
-		});
-
-		let stdin = io::stdin();
-		let input = &mut String::new();
-
-		input.clear();
-		println!("Press enter to stop playback");
-		let _ = stdin.read_line(input);
-		exit_loop.store(true, Ordering::Relaxed);
-		ctx.wakeup();
-
-
-	});
-
 	// Wait for key presses.
+	println!("Press enter to stop playback");
+	let stdin = io::stdin();
+	let input = &mut String::new();
+	let _ = stdin.read_line(input);
+
 	Ok(())
 }
 

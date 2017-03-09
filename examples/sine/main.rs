@@ -1,10 +1,8 @@
 extern crate soundio;
-extern crate rand;
 extern crate crossbeam;
 
 use std::f64::consts::PI;
 use std::io;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 struct SineWavePlayer {
 	phase: f64, // Phase is updated each time the write callback is called.
@@ -24,7 +22,7 @@ impl SineWavePlayer {
 
 		for c in 0..stream.channel_count() {
 			for f in 0..stream.frame_count() {
-				stream.set_sample_typed::<f32>(c, f, (self.phase.sin() * self.amplitude) as f32);
+				stream.set_sample(c, f, (self.phase.sin() * self.amplitude) as f32);
 				self.phase += phase_step;
 			}
 		}
@@ -55,7 +53,9 @@ fn run() -> Result<(), String> {
 
 	println!("InitAudioBackend error: {}", soundio::Error::InitAudioBackend);
 
-	let mut ctx = soundio::Context::new("Test App");
+	let mut ctx = soundio::Context::new();
+
+	ctx.set_app_name("Sine Wave");
 
 	println!("Available backends: {:?}", ctx.available_backends());
 
@@ -64,13 +64,11 @@ fn run() -> Result<(), String> {
 	println!("Current backend: {:?}", ctx.current_backend());
 
 	// We have to flush events so we can scan devices.
-	println!("Flushing events.");
 	ctx.flush_events();
-	println!("Flushed");
 
 	// Builtin and default layouts.
 
-	let builtin_layouts = soundio::ChannelLayout::get_builtin();
+	let builtin_layouts = soundio::ChannelLayout::get_all_builtin();
 	for layout in builtin_layouts {
 		println!("Builtin layout: {:?}", layout);
 	}
@@ -81,8 +79,8 @@ fn run() -> Result<(), String> {
 	println!("Default stereo layout: {:?}", default_stereo_layout);
 
 
-	println!("Input device count: {}", ctx.input_device_count().unwrap_or(0));
-	println!("Output device count: {}", ctx.output_device_count().unwrap_or(0));
+	println!("Input device count: {}", ctx.input_device_count());
+	println!("Output device count: {}", ctx.output_device_count());
 
 	let output_devices = ctx.output_devices().map_err(|_| "Error getting output devices".to_string())?;
 	let input_devices = ctx.input_devices().map_err(|_| "Error getting input devices".to_string())?;
@@ -99,12 +97,10 @@ fn run() -> Result<(), String> {
 
 	println!("Default output device: {} {}", output_dev.name(), if output_dev.is_raw() { "raw" } else { "cooked" } );
 
-	// What I want to do is something like this:
-
 	let mut sine = SineWavePlayer {
 		phase: 0.0,
-		amplitude: 0.5,
-		frequency: 400.0,
+		amplitude: 0.3,
+		frequency: 200.0,
 	};
 
 	println!("Opening default output stream");
@@ -121,36 +117,12 @@ fn run() -> Result<(), String> {
 	println!("Starting stream");
 	output_stream.start()?;
 
-
-	let exit_loop = AtomicBool::new(false);
-	let exit_loop_ref = &exit_loop;
-
 	// Run the loop in a new thread.
+	println!("Press enter to exit");
+	let stdin = io::stdin();
+	let input = &mut String::new();
+	let _ = stdin.read_line(input);
 
-	crossbeam::scope(|scope| {
-
-		let ctx_ref = &ctx;
-
-        scope.spawn(move || {
-			while exit_loop_ref.load(Ordering::Relaxed) != true {
-				println!("wait_events");
-				ctx_ref.wait_events();
-				println!("waited");
-			}
-		});
-
-		let stdin = io::stdin();
-		let input = &mut String::new();
-
-		input.clear();
-		println!("Waiting for line");
-		let _ = stdin.read_line(input);
-		println!("Got line");
-		exit_loop.store(true, Ordering::Relaxed);
-		println!("Exit loop stored");
-		ctx.wakeup();
-
-	});
 	// Wait for key presses.
 	Ok(())
 }
