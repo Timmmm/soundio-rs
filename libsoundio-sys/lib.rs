@@ -279,7 +279,7 @@ pub struct SoundIo {
     pub userdata: *mut c_void,
     // Optional callback. Called when the list of devices change. Only called
     // during a call to ::soundio_flush_events or ::soundio_wait_events.
-	pub on_devices_change: *mut extern fn(sio: *mut SoundIo),
+	pub on_devices_change: Option<extern fn(sio: *mut SoundIo)>,
     // Optional callback. Called when the backend disconnects. For example,
     // when the JACK server shuts down. When this happens, listing devices
     // and opening streams will always fail with
@@ -296,11 +296,11 @@ pub struct SoundIo {
     // * #SoundIoErrorSystemResources
     // * #SoundIoErrorOpeningDevice - unexpected problem accessing device
     //   information
-	pub on_backend_disconnect: *mut extern fn(sio: *mut SoundIo, err: c_int),
+	pub on_backend_disconnect: Option<extern fn(sio: *mut SoundIo, err: c_int)>,
     // Optional callback. Called from an unknown thread that you should not use
     // to call any soundio functions. You may use this to signal a condition
     // variable to wake up. Called when ::soundio_wait_events would be woken up.
-	pub on_events_signal: *mut extern fn(sio: *mut SoundIo),
+	pub on_events_signal: Option<extern fn(sio: *mut SoundIo)>,
 
     // Read-only. After calling ::soundio_connect or ::soundio_connect_backend,
     // this field tells which backend is currently connected.
@@ -318,7 +318,7 @@ pub struct SoundIo {
     // a message instructing the user how to configure their system to allow
     // real-time priority threads. This must be set to a function not NULL.
     // To silence the warning, assign this to a function that does nothing.
-	pub emit_rtprio_warning: *mut extern fn(),
+	pub emit_rtprio_warning: Option<extern fn()>,
 
     // Optional: JACK info callback.
     // By default, libsoundio sets this to an empty function in order to
@@ -326,10 +326,10 @@ pub struct SoundIo {
     // setting this to `NULL` or providing your own function. This is
     // registered with JACK regardless of whether ::soundio_connect_backend
     // succeeds.
-	pub jack_info_callback: *mut extern fn(msg: *const c_char),
+	pub jack_info_callback: Option<extern fn(msg: *const c_char)>,
     // Optional: JACK error callback.
     // See SoundIo::jack_info_callback
-	pub jack_error_callback: *mut extern fn(msg: *const c_char),
+	pub jack_error_callback: Option<extern fn(msg: *const c_char)>,
 }
 
 // The size of this struct is not part of the API or ABI.
@@ -506,19 +506,19 @@ pub struct SoundIoOutStream {
     // for a long time. This includes all I/O functions (disk, TTY, network),
     // malloc, free, printf, pthread_mutex_lock, sleep, wait, poll, select,
     // pthread_join, pthread_cond_wait, etc.
-	pub write_callback: *mut extern fn(stream: *mut SoundIoOutStream, frame_count_min: c_int, frame_count_max: c_int),
+	pub write_callback: extern fn(stream: *mut SoundIoOutStream, frame_count_min: c_int, frame_count_max: c_int),
     // This optional callback happens when the sound device runs out of
     // buffered audio data to play. After this occurs, the outstream waits
     // until the buffer is full to resume playback.
     // This is called from the SoundIoOutStream::write_callback thread context.
-	pub underflow_callback: *mut extern fn(stream: *mut SoundIoOutStream),
+	pub underflow_callback: Option<extern fn(stream: *mut SoundIoOutStream)>,
     // Optional callback. `err` is always SoundIoErrorStreaming.
     // SoundIoErrorStreaming is an unrecoverable error. The stream is in an
     // invalid state and must be destroyed.
     // If you do not supply error_callback, the default callback will print
     // a message to stderr and then call `abort`.
     // This is called from the SoundIoOutStream::write_callback thread context.
-	pub error_callback: *mut extern fn(stream: *mut SoundIoOutStream, err: c_int),
+	pub error_callback: Option<extern fn(stream: *mut SoundIoOutStream, err: c_int)>,
 
     // Optional: Name of the stream. Defaults to "SoundIoOutStream"
     // PulseAudio uses this for the stream name.
@@ -591,19 +591,19 @@ pub struct SoundIoInStream {
     // for a long time. This includes all I/O functions (disk, TTY, network),
     // malloc, free, printf, pthread_mutex_lock, sleep, wait, poll, select,
     // pthread_join, pthread_cond_wait, etc.
-	pub read_callback: *mut extern fn(stream: *mut SoundIoInStream, frame_count_min: c_int, frame_count_max: c_int),
+	pub read_callback: extern fn(stream: *mut SoundIoInStream, frame_count_min: c_int, frame_count_max: c_int),
     // This optional callback happens when the sound device buffer is full,
     // yet there is more captured audio to put in it.
     // This is never fired for PulseAudio.
     // This is called from the SoundIoInStream::read_callback thread context.
-	pub overflow_callback: *mut extern fn(stream: *mut SoundIoInStream),
+	pub overflow_callback: Option<extern fn(stream: *mut SoundIoInStream)>,
     // Optional callback. `err` is always SoundIoErrorStreaming.
     // SoundIoErrorStreaming is an unrecoverable error. The stream is in an
     // invalid state and must be destroyed.
     // If you do not supply `error_callback`, the default callback will print
     // a message to stderr and then abort().
     // This is called from the SoundIoInStream::read_callback thread context.
-	pub error_callback: *mut extern fn(stream: *mut SoundIoInStream, err: c_int),
+	pub error_callback: Option<extern fn(stream: *mut SoundIoInStream, err: c_int)>,
 
     // Optional: Name of the stream. Defaults to "SoundIoInStream";
     // PulseAudio uses this for the stream name.

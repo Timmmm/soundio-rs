@@ -128,9 +128,9 @@ impl<'a> Context<'a> {
 		// That may actually be reasonable behaviour. I'm not sure under which conditions
 		// disconnects occur.
 		unsafe {
-			(*context.soundio).on_backend_disconnect = on_backend_disconnect as *mut extern fn(*mut raw::SoundIo, i32);
-			(*context.soundio).on_devices_change = on_devices_change as *mut extern fn(*mut raw::SoundIo);
-			(*context.soundio).on_events_signal = on_events_signal as *mut _;
+			(*context.soundio).on_backend_disconnect = Some(on_backend_disconnect);
+			(*context.soundio).on_devices_change = Some(on_devices_change);
+			(*context.soundio).on_events_signal = Some(on_events_signal);
 			// (*context.soundio).app_name is already set by default to point to a static C string "SoundIo".
 
 			// This callback is not used - see its documentation for more information.

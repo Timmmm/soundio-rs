@@ -344,9 +344,9 @@ impl<'a> Device<'a> {
 			(*outstream).format = format.into();
 			(*outstream).layout = layout.into();
 			(*outstream).software_latency = latency;
-			(*outstream).write_callback = outstream_write_callback as *mut _;
-			(*outstream).underflow_callback = outstream_underflow_callback as *mut _;
-			(*outstream).error_callback = outstream_error_callback as *mut _;
+			(*outstream).write_callback = outstream_write_callback;
+			(*outstream).underflow_callback = Some(outstream_underflow_callback);
+			(*outstream).error_callback = Some(outstream_error_callback);
 		}
 
 		let mut stream = OutStream {
@@ -448,9 +448,9 @@ impl<'a> Device<'a> {
 			(*instream).format = format.into();
 			(*instream).layout = layout.into();
 			(*instream).software_latency = latency;
-			(*instream).read_callback = instream_read_callback as *mut _;
-			(*instream).overflow_callback = instream_overflow_callback as *mut _;
-			(*instream).error_callback = instream_error_callback as *mut _;
+			(*instream).read_callback = instream_read_callback;
+			(*instream).overflow_callback = Some(instream_overflow_callback);
+			(*instream).error_callback = Some(instream_error_callback);
 		}
 
 		let mut stream = InStream {
