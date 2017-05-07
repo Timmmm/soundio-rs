@@ -179,20 +179,19 @@ mod backend;
 mod format;
 mod sample;
 
-// Currently I export everything, including things that should be
-// private. When `pub(crate)` arrives I will change this.
 pub use self::types::*;
 pub use self::context::*;
 pub use self::device::*;
 pub use self::instream::*;
 pub use self::outstream::*;
-pub use self::util::*;
 pub use self::layout::*;
 pub use self::error::*;
 pub use self::channels::*;
 pub use self::backend::*;
 pub use self::format::*;
 pub use self::sample::*;
+
+use self::util::*;
 
 /// Return the libsoundio version string, for example `"1.0.2"`.
 ///
