@@ -2,7 +2,7 @@
 
 extern crate libc;
 
-use std::os::raw::{c_char, c_void, c_int, c_double};
+use std::os::raw::{c_char, c_void, c_int, c_double, c_float};
 
 // There is no c_bool, but you can use Rust's i8 or bool instead.
 // See https://github.com/rust-lang/rfcs/pull/954#issuecomment-169820630
@@ -487,6 +487,7 @@ pub struct SoundIoOutStream {
     // For JACK, this value is always equal to
     // SoundIoDevice::software_latency_current of the device.
     pub software_latency: c_double,
+    pub volume: c_float,
 
     // Defaults to NULL. Put whatever you want here.
     pub userdata: *mut c_void,
