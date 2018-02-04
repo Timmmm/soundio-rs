@@ -74,7 +74,7 @@ fn main() {
 	// If we're cross-compiling to Windows from a non-Windows platform...
 	if windows && !host.contains("windows") {
 		// Get the name of the C compiler.
-		let c_compiler = gcc::Config::new().cargo_metadata(false)
+		let c_compiler = gcc::Build::new().cargo_metadata(false)
 										   .get_compiler();
 		let exe = c_compiler.path();
 
