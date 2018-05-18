@@ -13,19 +13,30 @@ struct WavRecorder {
 
 impl WavRecorder {
 	fn read_callback(&mut self, stream: &mut soundio::InStreamReader) {
-		let frame_count_max = stream.frame_count_max();
-		if let Err(e) = stream.begin_read(frame_count_max) {
-			println!("Error reading from stream: {}", e);
-			return;
-		}
+		let mut frames_left = stream.frame_count_max();
 
-		for f in 0..stream.frame_count() {
-			for c in 0..stream.channel_count() {
-				// In reality you shouldn't write to disk in the callback, but have some buffer instead.
-				match self.writer.write_sample(stream.sample::<i16>(c, f)) {
-					Ok(_) => {},
-					Err(e) => println!("Error: {}", e),
+		// libsoundio reads samples in chunks, so we need to loop until there's nothing to read.
+		loop {
+			if let Err(e) = stream.begin_read(frames_left) {
+				println!("Error reading from stream: {}", e);
+				return;
+			}
+			for f in 0..stream.frame_count() {
+				for c in 0..stream.channel_count() {
+					// In reality you shouldn't write to disk in the callback, but have some buffer instead.
+					match self.writer.write_sample(stream.sample::<i16>(c, f)) {
+						Ok(_) => {},
+						Err(e) => println!("Error: {}", e),
+					}
 				}
+			}
+
+			stream.end_read();
+
+			frames_left -= stream.frame_count();
+			if frames_left <= 0
+			{
+				break;
 			}
 		}
 	}
@@ -35,7 +46,7 @@ impl WavRecorder {
 fn record(filename: &str) -> Result<(), String> {
 
 	// TODO: Probe which channels/sample rates are available.
-	let channels = 1;
+	let channels = 2;
 	let sample_rate = 44100;
 
 	let spec = hound::WavSpec {
@@ -77,7 +88,7 @@ fn record(filename: &str) -> Result<(), String> {
 		sample_rate as _,
 		soundio_format,
 		default_layout,
-		2.0,
+		0.1,
 		|x| recorder.read_callback(x),
 		None::<fn()>,
 		None::<fn(soundio::Error)>,

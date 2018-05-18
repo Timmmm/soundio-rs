@@ -238,7 +238,6 @@ impl<'a> InStreamReader<'a> {
 	///   case this error code is returned.
 	///
 	pub fn begin_read(&mut self, frame_count: usize) -> Result<usize> {
-		assert!(!self.read_started, "begin_read() called twice!");
 		assert!(frame_count >= self.frame_count_min && frame_count <= self.frame_count_max, "frame_count out of range");
 
 		let mut areas: *mut raw::SoundIoChannelArea = ptr::null_mut();
@@ -248,12 +247,39 @@ impl<'a> InStreamReader<'a> {
 			0 => {
 				self.read_started = true;
 				self.frame_count = actual_frame_count as _;
+				// Return now if there's no frames to actually read.
+				if actual_frame_count <= 0
+				{
+					return Ok(0);
+				}
 				let cc = self.channel_count();
 				self.channel_areas = vec![raw::SoundIoChannelArea { ptr: ptr::null_mut(), step: 0 }; cc];
 				unsafe { self.channel_areas.copy_from_slice(slice::from_raw_parts::<raw::SoundIoChannelArea>(areas, cc)); }
 				Ok(actual_frame_count as _)
 			},
 			e => Err(e.into()),
+		}
+	}
+
+	/// Commits the write that you began with `begin_read()`.
+	///
+	/// Errors are currently are just printed to the console and ignored.
+	///
+	/// # Errors
+	///
+	/// * `Error::Streaming`
+	/// * `Error::Underflow` - an underflow caused this call to fail. You might
+	///   also get an `underflow_callback()`, and you might not get
+	///   this error code when an underflow occurs. Unlike `Error::Streaming`,
+	///   the outstream is still in a valid state and streaming can continue.
+	pub fn end_read(&mut self) {
+		if self.read_started {
+			unsafe {
+				match raw::soundio_instream_end_read(self.instream) {
+					0 => {},
+					x => println!("Error ending instream: {}", Error::from(x)),
+				}
+			}
 		}
 	}
 	
@@ -370,7 +396,7 @@ impl<'a> InStreamReader<'a> {
 	// TODO: To acheive speed *and* safety I can use iterators. That will be in a future API.
 }
 
-impl<'a> Drop for InStreamReader<'a> {
+/*impl<'a> Drop for InStreamReader<'a> {
 	/// This will drop all of the frames from when you called `begin_read()`.
 	///
 	/// Errors are currently are just printed to the console and ignored.
@@ -388,7 +414,7 @@ impl<'a> Drop for InStreamReader<'a> {
 			}
 		}
 	}
-}
+}*/
 
 
 

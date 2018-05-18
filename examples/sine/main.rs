@@ -12,18 +12,27 @@ struct SineWavePlayer {
 
 impl SineWavePlayer {
 	fn write_callback(&mut self, stream: &mut soundio::OutStreamWriter) {
-		let frame_count_max = stream.frame_count_max();
-		if let Err(e) = stream.begin_write(frame_count_max) {
-			println!("Error writing to stream: {}", e);
-			return;
-		}
-		
-		let phase_step = self.frequency / stream.sample_rate() as f64 * 2.0 * PI;
+		let mut frames_left = stream.frame_count_max();
 
-		for c in 0..stream.channel_count() {
-			for f in 0..stream.frame_count() {
-				stream.set_sample(c, f, (self.phase.sin() * self.amplitude) as f32);
-				self.phase += phase_step;
+		loop {
+			if let Err(e) = stream.begin_write(frames_left) {
+				println!("Error writing to stream: {}", e);
+				return;
+			}
+			let phase_step = self.frequency / stream.sample_rate() as f64 * 2.0 * PI;
+
+			for c in 0..stream.channel_count() {
+				for f in 0..stream.frame_count() {
+					stream.set_sample(c, f, (self.phase.sin() * self.amplitude) as f32);
+					self.phase += phase_step;
+				}
+			}
+			stream.end_write();
+
+			frames_left -= stream.frame_count();
+			if frames_left <= 0
+			{
+				break;
 			}
 		}
 	}
