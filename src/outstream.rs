@@ -445,7 +445,7 @@ impl<'a> OutStreamWriter<'a> {
 }
 
 impl<'a> Drop for OutStreamWriter<'a> {
-	/// This will drop all of the frames from when you called `begin_read()`.
+	/// This will drop all of the frames from when you called `begin_write()`.
 	///
 	/// Errors are currently are just printed to the console and ignored.
 	///
