@@ -248,8 +248,7 @@ impl<'a> InStreamReader<'a> {
 				self.read_started = true;
 				self.frame_count = actual_frame_count as _;
 				// Return now if there's no frames to actually read.
-				if actual_frame_count <= 0
-				{
+				if actual_frame_count <= 0 {
 					return Ok(0);
 				}
 				let cc = self.channel_count();
@@ -276,7 +275,7 @@ impl<'a> InStreamReader<'a> {
 		if self.read_started {
 			unsafe {
 				match raw::soundio_instream_end_read(self.instream) {
-					0 => {},
+					0 => {self.read_started = false;},
 					x => println!("Error ending instream: {}", Error::from(x)),
 				}
 			}
@@ -396,7 +395,7 @@ impl<'a> InStreamReader<'a> {
 	// TODO: To acheive speed *and* safety I can use iterators. That will be in a future API.
 }
 
-/*impl<'a> Drop for InStreamReader<'a> {
+impl<'a> Drop for InStreamReader<'a> {
 	/// This will drop all of the frames from when you called `begin_read()`.
 	///
 	/// Errors are currently are just printed to the console and ignored.
@@ -414,7 +413,4 @@ impl<'a> InStreamReader<'a> {
 			}
 		}
 	}
-}*/
-
-
-
+}

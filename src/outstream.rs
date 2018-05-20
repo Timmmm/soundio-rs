@@ -295,8 +295,7 @@ impl<'a> OutStreamWriter<'a> {
 				self.write_started = true;
 				self.frame_count = actual_frame_count as _;
 				// Return now if there's no frames to actually read.
-				if actual_frame_count <= 0
-				{
+				if actual_frame_count <= 0 {
 					return Ok(0);
 				}
 				let cc = self.channel_count();
@@ -323,7 +322,7 @@ impl<'a> OutStreamWriter<'a> {
 		if self.write_started {
 			unsafe {
 				match raw::soundio_outstream_end_write(self.outstream) {
-					0 => {},
+					0 => {self.write_started = false;},
 					x => println!("Error writing outstream: {}", Error::from(x)),
 				}
 			}
@@ -443,4 +442,24 @@ impl<'a> OutStreamWriter<'a> {
 	}
 
 	// TODO: To acheive speed *and* safety I can use iterators. That will be in a future API.
+}
+
+impl<'a> Drop for OutStreamWriter<'a> {
+	/// This will drop all of the frames from when you called `begin_read()`.
+	///
+	/// Errors are currently are just printed to the console and ignored.
+	///
+	/// # Errors
+	///
+	/// * `Error::Streaming`
+	fn drop(&mut self) {
+		if self.write_started {
+			unsafe {
+				match raw::soundio_outstream_end_write(self.outstream) {
+					0 => {},
+					x => println!("Error writing outstream: {}", Error::from(x)),
+				}
+			}
+		}
+	}
 }

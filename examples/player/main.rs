@@ -45,13 +45,12 @@ impl WavPlayer {
 				}
 			}
 
-			stream.end_write();
-
 			frames_left -= stream.frame_count();
-			if frames_left <= 0
-			{
+			if frames_left <= 0 {
 				break;
 			}
+
+			stream.end_write();
 		}
 		if self.finished != was_finished {
 	//		stream.wakeup();

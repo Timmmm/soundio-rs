@@ -31,13 +31,12 @@ impl WavRecorder {
 				}
 			}
 
-			stream.end_read();
-
 			frames_left -= stream.frame_count();
-			if frames_left <= 0
-			{
+			if frames_left <= 0 {
 				break;
 			}
+
+			stream.end_read();
 		}
 	}
 }

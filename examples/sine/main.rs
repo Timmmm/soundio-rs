@@ -27,13 +27,13 @@ impl SineWavePlayer {
 					self.phase += phase_step;
 				}
 			}
-			stream.end_write();
 
 			frames_left -= stream.frame_count();
-			if frames_left <= 0
-			{
+			if frames_left <= 0 {
 				break;
 			}
+
+			stream.end_write();
 		}
 	}
 }
