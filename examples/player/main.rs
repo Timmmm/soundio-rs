@@ -13,7 +13,6 @@ use std::env;
 // let (write_callback, wav_player) = WavPlayer::new();
 //
 // Internally they can use a mutex to communicate.
-
 struct WavPlayer {
 	reader: hound::WavReader<BufReader<File>>,
 	finished: bool,
@@ -21,30 +20,37 @@ struct WavPlayer {
 
 impl WavPlayer {
 	fn write_callback(&mut self, stream: &mut soundio::OutStreamWriter) {
-		let frame_count_max = stream.frame_count_max();
-		if let Err(e) = stream.begin_write(frame_count_max) {
-			println!("Error writing to stream: {}", e);
-			return;
-		}
-
-		// Hound's sample conversion is not as awesome as mine. This will fail on floating point types.
-		let mut s = self.reader.samples::<i32>();
-
+		let mut frames_left = stream.frame_count_max();
 		let was_finished = self.finished;
-
-		for f in 0..stream.frame_count() {
-    		for c in 0..stream.channel_count() {
-				match s.next() {
-					Some(x) => {
-						stream.set_sample(c, f, x.unwrap()); 
-					},
-					None => {
-						stream.set_sample(c, f, 0);
-						self.finished = true;
-					}
-				}
-				
+		loop {
+			if let Err(e) = stream.begin_write(frames_left) {
+				println!("Error writing to stream: {}", e);
+				return;
 			}
+			// Hound's sample conversion is not as awesome as mine. This will fail on floating point types.
+			let mut s = self.reader.samples::<i32>();
+
+			for f in 0..stream.frame_count() {
+	    		for c in 0..stream.channel_count() {
+					match s.next() {
+						Some(x) => {
+							stream.set_sample(c, f, x.unwrap()*1000); 
+						},
+						None => {
+							stream.set_sample(c, f, 0);
+							self.finished = true;
+						}
+					}
+					
+				}
+			}
+
+			frames_left -= stream.frame_count();
+			if frames_left <= 0 {
+				break;
+			}
+
+			stream.end_write();
 		}
 		if self.finished != was_finished {
 	//		stream.wakeup();
@@ -75,7 +81,6 @@ fn play(filename: &str) -> Result<(), String> {
 	println!("Flushing events.");
 	ctx.flush_events();
 	println!("Flushed");
-
 
 	let channels = reader.spec().channels;
 	let sample_rate = reader.spec().sample_rate;
