@@ -3,6 +3,10 @@
 [![Crates.io](https://img.shields.io/crates/v/soundio.svg)](https://crates.io/crates/soundio)
 [![Docs](https://docs.rs/soundio/badge.svg)](https://docs.rs/soundio/)
 
+# Unmaintained!
+
+This crate isn't maintained, and has issues with device lifetimes (opening a stream mutably borrows the device so then you can't open a second stream from the same device). I suggest trying [CPAL](https://github.com/tomaka/cpal) instead.
+
 # soundio-rs
 
 This is a Rust wrapper for the amazing [libsoundio library](http://libsound.io/)
